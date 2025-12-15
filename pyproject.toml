@@ -1,0 +1,80 @@
+[tool.poetry]
+name = "meta-spliceai"
+version = "0.2.0"
+description = "Meta-SpliceAI: Adaptive splice site prediction via meta-learning for novel isoform discovery and disease-specific splicing analysis"
+authors = ["Barnett Chiu"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+polars = "^1.15.0"
+bcbio-gff = "0.7.1"
+bio = "1.7.1"
+biopython = "1.83"
+category-encoders = "2.6.3"
+configspace = "1.2.0"
+dask = "2024.5.0"
+dirtree = "0.3.0.dev0"
+distributed = "2024.5.0"
+fast-ml = "3.68"
+feature-engine = "1.8.1"
+fuzzywuzzy = "0.18.0"
+gffutils = "0.12"
+gtftools = "0.9.0"
+hdbscan = "0.8.38.post1"
+hpbandster = "0.7.4"
+hpbandster-sklearn = "2.0.2"
+hyperopt = "0.2.7"
+joblib = "1.4.2"
+keras = "3.5.0"
+lightgbm = "4.5.0"
+mappy = "2.26"
+matplotlib = "3.8.4"
+numpy = ">=1.23.5,<2.0.0"
+optuna = "4.0.0"
+orfipy = "0.0.4"
+pandarallel = "1.6.5"
+pandas = "2.2.2"
+pip = ">=24.2"
+plotly = "5.24.1"
+progress = "1.6"
+pybedtools = "0.9.1"
+pybigwig = "0.3.23"
+pyfastx = "2.1.0"
+pyodbc = "4.0.39"
+pytest = "8.2.1"
+requests = "2.32.3"
+scikit-learn = "1.5.2"
+scipy = "1.14.1"
+seaborn = "0.13.2"
+sequence-model = "0.6.0"
+setuptools = "72.1.0"
+shap = "0.46.0"
+spliceai = "1.3.1"
+sqlalchemy = "2.0.30"
+tabulate = "0.9.0"
+tenacity = "8.5.0"
+tensorflow = "2.17.0"
+torch = "2.3.0"
+tqdm = "4.66.1"
+twobitreader = "3.1.7"
+umap = "0.1.1"
+xgboost = "2.1.1"
+numba = "^0.60.0"
+
+
+[tool.poetry.scripts]
+# Base model prediction and evaluation
+run_base_model = "meta_spliceai.cli.run_base_model_cli:main"
+evaluate_predictions = "meta_spliceai.cli.evaluate_cli:main"
+
+# Genomic annotation tools
+annotate_splice_sites = "meta_spliceai.cli.splice_sites_cli:main"
+
+# Meta-model training entry points
+# Note: incremental_builder can be run with: python -m meta_spliceai.splice_engine.meta_models.builder.incremental_builder
+# meta-spliceai-build = "meta_spliceai.splice_engine.meta_models.builder.incremental_builder:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

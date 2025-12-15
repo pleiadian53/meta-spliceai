@@ -1,0 +1,30 @@
+{
+  "num_genes": 10,
+  "num_evaluations": 20,
+  "overall": {
+    "pr_auc_mean": 0.0,
+    "pr_auc_std": 0.0,
+    "top_k_accuracy_mean": 0.0,
+    "top_k_accuracy_std": 0.0,
+    "optimal_f1_mean": 0.0,
+    "optimal_f1_std": 0.0,
+    "f1_at_0_5_mean": 0.0,
+    "f1_at_0_5_std": 0.0,
+    "optimal_threshold_mean": 0.5,
+    "optimal_threshold_std": 0.0
+  },
+  "by_splice_type": {
+    "donor": {
+      "pr_auc_mean": 0.0,
+      "top_k_accuracy_mean": 0.0,
+      "optimal_f1_mean": 0.0,
+      "f1_at_0_5_mean": 0.0
+    },
+    "acceptor": {
+      "pr_auc_mean": 0.0,
+      "top_k_accuracy_mean": 0.0,
+      "optimal_f1_mean": 0.0,
+      "f1_at_0_5_mean": 0.0
+    }
+  }
+}

@@ -1,0 +1,135 @@
+dataset:
+  name: splicevardb_meta_training
+  description: SpliceVarDB variants scored by OpenSpliceAI; features and labels for
+    Meta-SpliceAI meta-learning.
+  paths:
+    features_parquet: data/features/splicevardb.delta.parquet
+    reference_fasta: /path/to/hg38.fa
+    raw_vcf: data/processed/splicevardb.hg38.norm.vcf.gz
+    scored_vcf: data/processed/splicevardb.openspliceai.vcf.gz
+  build: GRCh38
+labeling:
+  label_col: class
+  mapping:
+    splice-altering: 1
+    not splice-altering: 0
+  weak_classes:
+  - low-frequency splice-altering
+  weak_policy: holdout
+sample_weights:
+  weight_col: sample_weight
+  rules:
+  - when:
+      assay_type: RNA-seq
+    weight: 1.5
+  - when:
+      assay_type: minigene
+    weight: 1.2
+  - when:
+      assay_type: RT-PCR
+    weight: 1.1
+  - when:
+      class: low-frequency splice-altering
+    weight: 0.5
+  default: 1.0
+columns:
+  id:
+  - CHROM
+  - POS
+  - REF
+  - ALT
+  - gene
+  - pmids
+  - source_id
+  labels:
+  - class
+  features_numeric:
+  - donor_gain
+  - donor_loss
+  - acceptor_gain
+  - acceptor_loss
+  - dlg_pos
+  - alg_pos
+  - spliceai_wt_donor
+  - spliceai_wt_acceptor
+  - spliceai_alt_donor
+  - spliceai_alt_acceptor
+  - dist_to_nearest_junction
+  - gc_content
+  features_categorical:
+  - region_class
+  - assay_type
+  - evidence_strength
+  features_text: []
+transforms:
+  numeric:
+    impute:
+      strategy: median
+    scale: standard
+  categorical:
+    encoding: onehot
+    handle_unknown: ignore
+feature_generation:
+  region_class:
+    from:
+    - CHROM
+    - POS
+    method: annotate_region_class
+    params:
+      canonical_window: 2
+      near_window: 50
+  dist_to_nearest_junction:
+    from:
+    - CHROM
+    - POS
+    method: distance_to_junctions
+    params:
+      max_distance: 5000
+  gc_content:
+    from:
+    - CHROM
+    - POS
+    method: compute_gc_content
+    params:
+      window: 200
+splits:
+  strategy: grouped
+  group_col: gene
+  train_frac: 0.75
+  valid_frac: 0.15
+  test_frac: 0.1
+  stratify_col: region_class
+evaluation:
+  metrics:
+  - roc_auc
+  - average_precision
+  - f1
+  - precision
+  - recall
+  slices:
+  - name: canonical_only
+    where:
+      region_class: canonical
+  - name: deep_intronic_only
+    where:
+      region_class: deep_intronic
+  - name: cryptic_like
+    where:
+      region_class: cryptic
+  calibration:
+    method: isotonic
+model:
+  type: xgboost
+  params:
+    n_estimators: 800
+    max_depth: 5
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_lambda: 1.0
+  class_weighting: balanced
+export:
+  artifacts_dir: artifacts/splicevardb_meta/
+  save_feature_importance: true
+  save_calibration_curve: true
+  save_slice_reports: true

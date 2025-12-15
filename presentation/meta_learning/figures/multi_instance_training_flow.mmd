@@ -1,0 +1,58 @@
+%%{init: {
+  'theme': 'base',
+  'themeVariables': {
+    'primaryColor': '#e1f5fe',
+    'primaryTextColor': '#01579b',
+    'primaryBorderColor': '#0277bd',
+    'lineColor': '#0288d1',
+    'secondaryColor': '#f3e5f5',
+    'tertiaryColor': '#e8f5e8',
+    'background': '#ffffff',
+    'mainBkg': '#e3f2fd',
+    'secondBkg': '#f1f8e9',
+    'tertiaryBkg': '#fff3e0'
+  }
+}}%%
+
+graph TD
+    A["🗂️ Large Dataset<br/>9,280 genes<br/>3.7M positions"] --> B["🎯 Enhanced Strategy Selection"]
+    B --> C{"📊 Dataset Size Analysis"}
+    
+    C -->|Small-Medium| D["🔧 Single Model Training<br/>≤2,000 genes"]
+    C -->|Large + --train-all-genes| E["🚀 Multi-Instance Ensemble<br/>7 instances, 1,500 genes each"]
+    
+    E --> F1["📦 Instance 1<br/>Genes 1-1,500<br/>Complete Training Pipeline"]
+    E --> F2["📦 Instance 2<br/>Genes 1,350-2,850<br/>10% Overlap"]
+    E --> F3["📦 Instance 3<br/>Genes 2,700-4,200<br/>10% Overlap"]
+    E --> F4["📦 Instances 4-7<br/>Complete Coverage"]
+    
+    F1 --> G1["🎯 Meta-Model 1<br/>CV + SHAP + Calibration"]
+    F2 --> G2["🎯 Meta-Model 2<br/>CV + SHAP + Calibration"]
+    F3 --> G3["🎯 Meta-Model 3<br/>CV + SHAP + Calibration"]
+    F4 --> G4["🎯 Meta-Models 4-7<br/>CV + SHAP + Calibration"]
+    
+    G1 --> H["🔗 Model Consolidation<br/>Weighted Voting Ensemble"]
+    G2 --> H
+    G3 --> H
+    G4 --> H
+    
+    H --> I["🎪 ConsolidatedMetaModel<br/>Unified Interface"]
+    I --> J["⚡ Inference Workflow<br/>Single Model API"]
+
+    %% Styling for different node types
+    classDef datasetNode fill:#e3f2fd,stroke:#0277bd,stroke-width:3px,color:#01579b
+    classDef strategyNode fill:#f1f8e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
+    classDef decisionNode fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100
+    classDef instanceNode fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#880e4f
+    classDef modelNode fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px,color:#1a237e
+    classDef consolidationNode fill:#e0f2f1,stroke:#00695c,stroke-width:3px,color:#004d40
+    classDef finalNode fill:#f3e5f5,stroke:#7b1fa2,stroke-width:3px,color:#4a148c
+
+    class A datasetNode
+    class B,D strategyNode
+    class C decisionNode
+    class E strategyNode
+    class F1,F2,F3,F4 instanceNode
+    class G1,G2,G3,G4 modelNode
+    class H consolidationNode
+    class I,J finalNode

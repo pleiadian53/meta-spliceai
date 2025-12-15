@@ -1,0 +1,184 @@
+# Default Configuration for OpenSpliceAI Recalibration Training
+# =============================================================
+
+# Data Configuration
+data:
+  source: splicevardb
+  data_dir: ./data/splicevardb
+  genome_build: GRCh38
+  reference_genome: null  # Path to hg38.fa (required for real training)
+  cache_downloads: true
+  
+  # Variant filtering
+  filters:
+    min_evidence_strength: moderate  # weak, moderate, strong
+    require_validation: true
+    exclude_low_frequency: false
+  
+  # Train/test splits
+  splits:
+    strategy: gene_holdout  # gene_holdout, region_stratified, random
+    train_fraction: 0.75
+    valid_fraction: 0.15
+    test_fraction: 0.10
+    
+    # Genes to hold out for testing (classic splice variant genes)
+    test_genes:
+      - CFTR
+      - BRCA1
+      - BRCA2
+      - DMD
+      - NF1
+    
+    # Stratification
+    stratify_by: region_class  # region_class, gene, chromosome
+
+# Model Configuration
+model:
+  base_model: openspliceai
+  base_model_dir: null  # Auto-detect if null
+  ensemble: true  # Use 5-model ensemble
+  context_size: 10000  # Nucleotides
+  
+  recalibration:
+    method: isotonic  # isotonic, platt, beta, xgboost
+    
+    # Method-specific parameters
+    isotonic:
+      increasing: true
+      out_of_bounds: clip
+    
+    platt:
+      max_iter: 100
+      
+    xgboost:
+      n_estimators: 100
+      max_depth: 5
+      learning_rate: 0.1
+      subsample: 0.8
+      colsample_bytree: 0.8
+
+# Feature Configuration
+features:
+  feature_set: delta_full  # delta_basic, delta_full, delta_plus_context
+  
+  # Delta score features (always included)
+  delta_scores:
+    - donor_gain
+    - donor_loss
+    - acceptor_gain
+    - acceptor_loss
+  
+  # Derived features
+  derived:
+    - max_donor_delta
+    - max_acceptor_delta
+    - max_any_delta
+    - gain_loss_ratio
+    - donor_acceptor_balance
+  
+  # Positional features
+  positional:
+    - donor_gain_pos
+    - donor_loss_pos
+    - acceptor_gain_pos
+    - acceptor_loss_pos
+    - distance_to_variant
+  
+  # Context features (if delta_plus_context)
+  context:
+    - gc_content
+    - kmer_features
+    - region_class
+    - distance_to_junction
+
+# Training Configuration
+training:
+  # Sample weighting
+  use_sample_weights: true
+  weight_scheme:
+    RNA-seq: 1.5
+    minigene: 1.2
+    RT-PCR: 1.1
+    computational: 0.5
+    default: 1.0
+  
+  # Class balancing
+  balance_classes: true
+  balance_method: undersample  # oversample, undersample, smote
+  
+  # Optimization
+  optimization:
+    metric: auc_roc  # auc_roc, auc_pr, f1
+    direction: maximize
+    n_trials: 50  # For hyperparameter search
+  
+  # Cross-validation
+  cross_validation:
+    n_folds: 5
+    shuffle: true
+    random_state: 42
+
+# Evaluation Configuration
+evaluation:
+  # Metrics to compute
+  metrics:
+    - auc_roc
+    - auc_pr
+    - f1
+    - precision
+    - recall
+    - calibration_error
+  
+  # Region-specific evaluation
+  evaluate_by_region: true
+  regions:
+    - canonical
+    - near_splice
+    - cryptic
+    - deep_intronic
+  
+  # Clinical thresholds
+  clinical_thresholds:
+    sensitivity_target: 0.95  # For specificity at 95% sensitivity
+    precision_target: 0.90  # For recall at 90% precision
+
+# Output Configuration
+output:
+  output_dir: ./models/openspliceai_recalibration
+  save_predictions: true
+  save_features: true
+  save_model: true
+  
+  # Report generation
+  reports:
+    training_report: true
+    feature_importance: true
+    calibration_plot: true
+    roc_curve: true
+    pr_curve: true
+    confusion_matrix: true
+    region_analysis: true
+
+# Runtime Configuration
+runtime:
+  device: auto  # auto, cpu, cuda, mps
+  n_jobs: -1  # Number of parallel jobs (-1 = all CPUs)
+  verbose: 1  # 0=silent, 1=info, 2=debug
+  random_seed: 42
+  
+  # Memory management
+  batch_size: 100  # Variants per batch
+  cache_predictions: true
+  low_memory_mode: false
+
+# Logging Configuration
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  log_file: null  # Path to log file (null = stdout only)
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+
+
+
+

@@ -1,0 +1,333 @@
+# Meta-SpliceAI .gitignore
+
+# ============================================================================
+# Data files (large genomic data)
+# ============================================================================
+data/
+*.tsv
+*.parquet
+*.fa
+*.fasta
+*.fna
+*.gtf
+*.gff
+*.gff3
+*.bed
+*.bam
+*.sam
+*.vcf
+*.vcf.gz
+*.bw
+*.bigwig
+
+# Exceptions: keep small example/test data
+!tests/data/
+!examples/data/
+
+# ============================================================================
+# Logs and outputs
+# ============================================================================
+logs/
+*.log
+nohup.out
+*.out
+*.err
+
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# ============================================================================
+# Environments
+# ============================================================================
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.conda
+*.mamba
+
+# Mamba/Conda
+.conda/
+.mamba/
+
+# ============================================================================
+# IDEs and Editors
+# ============================================================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim
+*.swp
+*.swo
+*~
+.vim/
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ============================================================================
+# Jupyter Notebook
+# ============================================================================
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+*.ipynb
+# Exception: keep example notebooks
+!examples/*.ipynb
+!tutorials/*.ipynb
+
+# Jupyter Notebook config
+.jupyter/
+
+# ============================================================================
+# Testing
+# ============================================================================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+.pytype/
+
+# ============================================================================
+# Documentation
+# ============================================================================
+docs/_build/
+docs/_static/
+docs/_templates/
+site/
+
+# Sphinx
+docs/.doctrees/
+
+# ============================================================================
+# Model artifacts and large files
+# ============================================================================
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.joblib
+*.pt
+*.pth
+*.ckpt
+*.model
+*.weights
+
+# Exceptions: keep small test models
+!tests/fixtures/*.pkl
+!tests/fixtures/*.h5
+
+# ============================================================================
+# Temporary and cache files
+# ============================================================================
+*.tmp
+*.temp
+*.cache
+.cache/
+*.sqlite
+*.db
+
+# ============================================================================
+# Project-specific
+# ============================================================================
+# Development notes and temporary documentation (not for public GitHub)
+dev/
+dev/*
+
+# Experimental outputs and results (large files)
+experiments/
+output/
+results/
+models/
+
+# Case studies with large data
+tests/uORF_explorer/
+
+# Excluded packages (reference code, not dependencies)
+# - splam: SPLAM splice predictor reference code
+# - uORF_explorer: uORF analysis tools (analysis scripts only)
+# NOTE: openspliceai/ is REQUIRED (base_models/loaders.py depends on it)
+meta_spliceai/splam/
+meta_spliceai/uORF_explorer/
+
+# Related analysis scripts (depend on excluded packages)
+meta_spliceai/analyze_pub_results.py
+
+# Large data files in source tree (should be regenerated)
+meta_spliceai/gene_features.csv
+
+# Additional excluded packages/directories
+meta_spliceai/target_selection/
+
+# Root-level test artifacts (outdated, deleted)
+test_data/
+test_phase1_output/
+phase1_comparison/
+
+# IDE and editor settings
+.cursor/
+.vscode/
+.idea/
+
+# Backups and temporary files
+backups/
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+
+# Presentation files (large)
+docs/slides/
+*.pptx
+*.ppt
+
+# Private source code 
+scripts/archive/
+fabric/
+backups/
+backup_*/
+meta_spliceai_fabric/
+*_surveyor*/
+
+# Backup scripts (for local use only)
+backup_project.py
+backup_source_code.sh
+backup_source_code_lean.sh
+backup_*.py
+backup_*.sh
+
+# Cursor IDE settings
+.cursor/
+
+# Distribution files (may contain old "surveyor" names)
+dist/
+wheels/
+*.whl
+
+# Logs and debugging
+logs/
+*.log
+nohup.out
+
+# Testing files and test data
+tests/
+test_data/
+test_output/
+
+# Base model evaluation outputs (e.g., SpliceAI, OpenSpliceAI, SpliceGNN, etc.)
+**/spliceai_eval/
+**/openspliceai_eval/
+**/meta_models/
+
+# Exceptions: keep structure documentation
+!docs/**/spliceai_eval/
+!docs/**/openspliceai_eval/
+
+# Gene sequences (large parquet files)
+gene_sequence_*.parquet
+analysis_sequences_*.tsv
+splice_positions_*.tsv
+splice_errors_*.tsv
+
+# Chromsome-specific outputs
+*_chr*.tsv
+*_chr*.parquet
+
+# ============================================================================
+# Security and credentials
+# ============================================================================
+*.key
+*.pem
+*.secret
+.env
+.env.local
+.env.*.local
+credentials.json
+secrets.yaml
+
+# ============================================================================
+# Backup files
+# ============================================================================
+*.bak
+*.backup
+*.old
+*.orig
+*~
+
+# ============================================================================
+# Compressed files (except small examples)
+# ============================================================================
+*.gz
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Exceptions: keep small test data
+!tests/data/*.gz
+!examples/data/*.gz

@@ -1,0 +1,29 @@
+{
+    "name": "moderate",
+    "description": "Balanced settings for 5K-10K genes on systems with 32GB+ RAM",
+    "target_dataset_size": "5K-10K genes",
+    "min_ram_gb": 32,
+    "recommended_swap_gb": 16,
+    "settings": {
+        "batch_size": 200,
+        "batch_rows": 15000,
+        "kmer_sizes": [3],
+        "enrichers": ["gene_level", "length_features", "performance_features"],
+        "downsample_kwargs": {
+            "hard_prob_thresh": 0.15,
+            "window_nt": 50,
+            "easy_neg_ratio": 0.5
+        },
+        "environment_vars": {
+            "POLARS_MAX_THREADS": 4,
+            "ARROW_PRETTY_PRINT": "0",
+            "PYTHONHASHSEED": "0"
+        }
+    },
+    "expected_performance": {
+        "peak_memory_gb": 25,
+        "processing_time_per_1000_genes_hours": 1.5,
+        "disk_space_gb_per_1000_genes": 2.0
+    },
+    "usage_example": "python -m meta_spliceai.splice_engine.meta_models.builder.incremental_builder --n-genes 5000 --batch-size 200 --batch-rows 15000 --kmer-sizes 3 --output-dir train_pc_5000_moderate"
+} 

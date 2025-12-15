@@ -1,0 +1,29 @@
+{
+    "name": "conservative",
+    "description": "Ultra-conservative settings for 1K-5K genes on systems with limited RAM",
+    "target_dataset_size": "1K-5K genes",
+    "min_ram_gb": 16,
+    "recommended_swap_gb": 8,
+    "settings": {
+        "batch_size": 50,
+        "batch_rows": 5000,
+        "kmer_sizes": [3],
+        "enrichers": ["gene_level", "length_features"],
+        "downsample_kwargs": {
+            "hard_prob_thresh": 0.10,
+            "window_nt": 50,
+            "easy_neg_ratio": 0.3
+        },
+        "environment_vars": {
+            "POLARS_MAX_THREADS": 2,
+            "ARROW_PRETTY_PRINT": "0",
+            "PYTHONHASHSEED": "0"
+        }
+    },
+    "expected_performance": {
+        "peak_memory_gb": 12,
+        "processing_time_per_1000_genes_hours": 2,
+        "disk_space_gb_per_1000_genes": 1.5
+    },
+    "usage_example": "python -m meta_spliceai.splice_engine.meta_models.builder.incremental_builder --n-genes 1000 --batch-size 50 --batch-rows 5000 --kmer-sizes 3 --output-dir train_pc_1000_conservative"
+} 

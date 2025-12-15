@@ -1,0 +1,57 @@
+{
+  "timestamp": "2025-09-10T22:22:50.683424",
+  "dataset": "ClinVar_20250831",
+  "vcf_directory": "/home/bchiu/work/meta-spliceai/data/ensembl/clinvar/vcf/clinvar_20250831_main_chroms.vcf.gz",
+  "reference_fasta": "/home/bchiu/work/meta-spliceai/data/ensembl/Homo_sapiens.GRCh38.dna.primary_assembly.fa",
+  "validation_results": {
+    "file_integrity": {
+      "files_present": {
+        "clinvar_20250831.vcf.gz": false,
+        "clinvar_20250831_reheadered.vcf.gz": false,
+        "clinvar_20250831_main_chroms.vcf.gz": false
+      },
+      "file_sizes": {
+        "clinvar_20250831.vcf.gz": 0,
+        "clinvar_20250831_reheadered.vcf.gz": 0,
+        "clinvar_20250831_main_chroms.vcf.gz": 0
+      },
+      "index_files": {
+        "clinvar_20250831.vcf.gz": {
+          "tbi": false,
+          "csi": false,
+          "has_index": false
+        },
+        "clinvar_20250831_reheadered.vcf.gz": {
+          "tbi": false,
+          "csi": false,
+          "has_index": false
+        },
+        "clinvar_20250831_main_chroms.vcf.gz": {
+          "tbi": false,
+          "csi": false,
+          "has_index": false
+        }
+      },
+      "compression_valid": {
+        "clinvar_20250831.vcf.gz": false,
+        "clinvar_20250831_reheadered.vcf.gz": false,
+        "clinvar_20250831_main_chroms.vcf.gz": false
+      }
+    },
+    "vcf_format": {},
+    "variant_statistics": {},
+    "file_comparison": {}
+  },
+  "overall_assessment": {
+    "file_integrity_score": 0.0,
+    "format_compliance_score": 0,
+    "coordinate_consistency_score": 0,
+    "overall_score": 0.0,
+    "recommendation": "POOR - Significant issues require resolution",
+    "issues": [
+      "Coordinate system inconsistencies detected",
+      "Missing files or index issues"
+    ],
+    "strengths": []
+  }
+}

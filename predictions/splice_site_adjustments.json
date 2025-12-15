@@ -1,0 +1,10 @@
+{
+    "donor": {
+        "plus": 2,
+        "minus": 1
+    },
+    "acceptor": {
+        "plus": 0,
+        "minus": -1
+    }
+}
