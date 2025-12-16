@@ -2,7 +2,7 @@
 
 **Created**: December 15, 2025  
 **Status**: Active Development  
-**Last Updated**: December 15, 2025
+**Last Updated**: December 16, 2025
 
 ---
 
@@ -43,8 +43,8 @@ Base models are trained on canonical splice sites and fail to capture many varia
 │  │ • Target: SpliceVarDB-validated delta (ground truth filtering)        │  │
 │  │ • Output: Δ directly (single forward pass)                            │  │
 │  │                                                                        │  │
-│  │ Status: ✅ IMPLEMENTED & TESTED - r=0.41 (BEST SO FAR!)               │  │
-│  │ Advantage: Uses ground truth labels, efficient inference              │  │
+│  │ Status: ✅ IMPLEMENTED & TESTED - r=0.507 (BEST!) ⭐                   │  │
+│  │ Key finding: 8000 samples → r=0.507 (+24% vs 2000 samples)            │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
@@ -123,10 +123,10 @@ Base models are trained on canonical splice sites and fail to capture many varia
 
 ---
 
-### Phase 2B: Validated Delta Prediction (COMPLETED ✅)
+### Phase 2B: Validated Delta Prediction (COMPLETED ✅) ⭐ BEST APPROACH
 
 **Status**: Implemented and tested  
-**Result**: r=0.41 correlation (best so far!)  
+**Best Result**: r=0.507 correlation (8000 samples) ⭐  
 **Goal**: Use SpliceVarDB classifications to derive ground-truth delta targets
 
 **Key Difference from Phase 2A**:
@@ -142,14 +142,17 @@ Output: Δ directly (single forward pass)
 Final score = base_scores + Δ
 ```
 
-**Challenge**: How to derive delta values from categorical SpliceVarDB labels?
+**Results by Dataset Size**:
+| Samples | Correlation | ROC-AUC | PR-AUC |
+|---------|-------------|---------|--------|
+| 2,000 | r=0.41 | 0.58 | 0.62 |
+| **8,000** | **r=0.507** | **0.589** | **0.633** |
 
-**Options**:
-1. Binary delta: +1 if effect, 0 otherwise
-2. Magnitude from literature: e.g., +0.5 for gain, -0.5 for loss
-3. Learn magnitude end-to-end
+**Key Finding**: More data significantly helps (+24% correlation improvement)
 
-**Documentation**: `docs/methods/APPROACH_B_DELTA_PREDICTION.md` (to be created)
+**Documentation**: 
+- `docs/experiments/004_validated_delta/README.md`
+- `docs/methods/APPROACH_B_SINGLE_PASS.md`
 
 ---
 
@@ -185,17 +188,18 @@ Final score = base_scores + Δ
 
 | Model | File | Purpose | Status |
 |-------|------|---------|--------|
+| `ValidatedDeltaPredictor` ⭐ | `validated_delta_predictor.py` | Single-pass delta (Approach B) | **BEST: r=0.507** |
 | `DeltaPredictorV2` | `delta_predictor_v2.py` | Approach A (paired) | Tested |
 | `SimpleCNNDeltaPredictor` | `hyenadna_delta_predictor.py` | Gated CNN encoder | Tested |
 | `SpliceInducingClassifier` | `splice_classifier.py` | Multi-step Step 1 | Tested |
 | `EffectTypeClassifier` | `splice_classifier.py` | Multi-step Step 2 | Implemented, not tested |
 | `UnifiedSpliceClassifier` | `splice_classifier.py` | Multi-task | Implemented, not tested |
+| `HyenaDNADeltaPredictor` | `hyenadna_delta_predictor.py` | GPU encoder | Implemented, needs GPU |
 
-### Missing Implementations
+### Pending Implementations
 
 | Model | Purpose | Priority |
 |-------|---------|----------|
-| `ApproachBDeltaPredictor` | Single-pass delta (Approach B) | HIGH |
 | `PositionLocalizer` | Multi-step Step 3 | MEDIUM |
 | `DeltaMagnitudePredictor` | Multi-step Step 4 | LOW |
 
@@ -239,25 +243,29 @@ Final score = base_scores + Δ
 
 ## Next Steps (Prioritized)
 
-### Immediate (M1 Mac)
+### Completed ✅
 
-1. **Improve Multi-Step Step 1** (Binary Classification)
-   - Try larger context (1001nt vs 501nt)
-   - Add position-aware features
-   - Data augmentation (reverse complement)
-   - Target: F1 > 0.7
+1. ~~**Implement Approach B** (Single-Pass Delta)~~ → r=0.507 with 8000 samples
+2. ~~**More training data**~~ → Confirmed: +24% improvement with 4x data
 
-2. **Implement Approach B** (Single-Pass Delta)
-   - Define delta target derivation from SpliceVarDB
-   - Compare to Approach A
+### Remaining (M1 Mac)
 
-3. **Document methodology choices**
+1. **Longer context experiment** (1001nt vs 501nt)
+   - Test already implemented, pending run
+2. **Attention variant** for interpretability
+   - Test already implemented, pending run
 
-### With GPU (RunPods)
+### With GPU (RunPods) - High Priority
 
-1. **HyenaDNA encoder** for all approaches
-2. **Full SpliceVarDB** (~50K variants)
+1. **Full SpliceVarDB** (~50K variants) - Expected: r > 0.60
+2. **HyenaDNA encoder** for ValidatedDeltaPredictor
 3. **Cross-validation** on larger scale
+
+### Lower Priority
+
+4. **Improve Multi-Step Step 1** (Binary Classification)
+   - Current: AUC=0.61, F1=0.53
+   - Target: F1 > 0.7
 
 ---
 
@@ -270,12 +278,23 @@ meta_layer/docs/
 │   ├── APPROACH_A_PAIRED.md     # Siamese delta prediction
 │   ├── APPROACH_B_SINGLE_PASS.md # Single-pass delta prediction
 │   ├── MULTI_STEP_FRAMEWORK.md  # Decomposed approach
-│   └── COMPARISON.md            # Method comparison
+│   └── GPU_REQUIREMENTS.md      # Compute requirements
 │
 ├── experiments/                  # Detailed experiment logs
 │   ├── 001_canonical_classification/
 │   ├── 002_delta_prediction/
-│   └── 003_binary_classification/
+│   ├── 003_binary_classification/
+│   ├── 004_validated_delta/     # ⭐ Best results (r=0.507)
+│   ├── GPU_TRAINING_GUIDE.md    # RunPods setup
+│   └── DATA_TRANSFER_GUIDE.md   # Data transfer instructions
+│
+├── setup/                        # Environment setup
+│   ├── RUNPODS_COMPLETE_SETUP.md
+│   ├── RUNPODS_DISK_CONFIGURATION.md
+│   └── RUNPODS_STORAGE_REQUIREMENTS.md
+│
+├── wishlist/                     # Pending GPU experiments
+│   └── GPU_EXPERIMENTS.md
 │
 └── *.md                         # Architecture, guides, etc.
 ```
