@@ -33,7 +33,7 @@ dependencies:
       - h5py==3.11.0  # CRITICAL: 3.12+ breaks SpliceAI model loading
       - ml-dtypes==0.2.0  # Compatible with TensorFlow 2.15
       - optree==0.13.1
-      - protobuf==5.29.1
+      - protobuf==3.20.3  # TensorFlow 2.15 requires protobuf<4.24
       - psutil>=5.9.0
       - pybedtools==0.10.0
       - pyBigWig>=0.3.18
