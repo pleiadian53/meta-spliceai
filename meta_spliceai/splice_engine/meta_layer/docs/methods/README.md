@@ -27,32 +27,45 @@ This directory contains documentation for the various methodological approaches 
 | **"Rank variants by severity"** | ValidatedDelta | Quantitative ranking |
 | **"Explain to FDA/stakeholders"** | Multi-Step | Interpretable decision trail |
 
-### Two Complementary Approaches
+### Two Approaches → One Integrated Pipeline
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    CHOOSING YOUR APPROACH                                │
+│                    INTEGRATED CASCADE PIPELINE                           │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  MULTI-STEP FRAMEWORK ⭐ (For Decisions & Interpretation)               │
-│  ─────────────────────────────────────────────────────────               │
-│  ✅ "Is this pathogenic?"                                               │
-│  ✅ "What type of effect?"                                              │
-│  ✅ "Where exactly?"                                                    │
-│  ✅ Explainable to regulators                                           │
-│  ⚠️ Step 1 needs improvement (AUC=0.61 → need >0.75)                   │
+│  MULTI-STEP FRAMEWORK (Steps 1-3)                                       │
+│  ─────────────────────────────────                                       │
+│  Step 1: "Is this pathogenic?" ──────────────────┐                      │
+│  Step 2: "What type of effect?" ─────────────────┼──→ CASCADE           │
+│  Step 3: "Where exactly?" ───────────────────────┘    OUTPUTS           │
+│                                                           │              │
+│                                                           ↓              │
+│  CONDITIONED DELTA (Step 4) ⭐ NEW                                      │
+│  ─────────────────────────────────                                       │
+│  Input:  alt_seq + effect_type (Step 2) + position (Step 3)             │
+│  Output: Δ magnitude at the identified position                          │
 │                                                                          │
-│  VALIDATEDDELTA ⭐ (For Quantification & Ranking)                       │
-│  ─────────────────────────────────────────────────                       │
-│  ✅ r=0.507 correlation (best quantitative)                             │
-│  ✅ Continuous delta scores                                              │
-│  ✅ Rank variants by effect magnitude                                   │
-│  ⚠️ Requires threshold for yes/no decisions                            │
+│  ⚠️ CURRENT GAP: ValidatedDelta is STANDALONE (ignores Steps 1-3)      │
+│  🎯 TODO: Implement ConditionedDeltaPredictor using cascade outputs     │
 │                                                                          │
-│  RECOMMENDED: Use BOTH together for comprehensive analysis              │
+│  Expected: r=0.507 (standalone) → r>0.70 (conditioned)                  │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Why Cascading Matters
+
+The key insight of Multi-Step is **using previous answers to simplify subsequent questions**:
+
+| Step | Without Cascade | With Cascade | Simplification |
+|------|-----------------|--------------|----------------|
+| Step 2 | Predict for ALL variants | Only splice-altering | Cleaner training data |
+| Step 3 | Find position anywhere | Find donor (if donor_gain) | Narrower search |
+| Step 4 | Predict [L, 2] deltas | Predict Δ at position 127 | **Point estimate!** |
+
+**Current `ValidatedDelta` (r=0.507) is standalone** - it ignores this cascade!  
+**Proposed `ConditionedDelta`** would use Steps 1-3 outputs → much simpler task → better performance.
 
 ## Quick Reference
 

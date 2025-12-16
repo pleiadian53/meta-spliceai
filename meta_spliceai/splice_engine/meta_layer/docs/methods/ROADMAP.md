@@ -65,9 +65,11 @@ Base models are trained on canonical splice sites and fail to capture many varia
 │  │   • Status: NOT YET IMPLEMENTED                                       │  │
 │  │   • Value: ⭐ CRITICAL for ASO target design (exact position)         │  │
 │  │                                                                        │  │
-│  │ Step 4: Delta Magnitude                                               │  │
-│  │   • "How strong is the effect at that position?"                      │  │
-│  │   • Status: Use ValidatedDelta instead                                │  │
+│  │ Step 4: Delta Magnitude (CONDITIONED on Steps 1-3)                    │  │
+│  │   • "How strong is the effect at the identified position?"            │  │
+│  │   • Input: alt_seq + effect_type (Step 2) + position (Step 3)        │  │
+│  │   • Status: NOT YET IMPLEMENTED (ValidatedDelta is standalone)       │  │
+│  │   • TODO: Create ConditionedDeltaPredictor using cascade outputs     │  │
 │  │                                                                        │  │
 │  │ WHY IMPORTANT: Provides INTERPRETABLE decisions for FDA/stakeholders  │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
@@ -258,10 +260,22 @@ Final score = base_scores + Δ
 
 | Priority | Task | Why Important | Expected Outcome |
 |----------|------|---------------|------------------|
-| 1 | **Full SpliceVarDB** (50K) | Data scaling works | r > 0.60 |
-| 2 | **Multi-Step Step 2** (Effect Type) | Guides ASO design | 5-class classifier |
-| 3 | **Multi-Step Step 3** (Position) | ASO target selection | Position ± 5nt |
-| 4 | **HyenaDNA encoder** | Better sequence understanding | r > 0.65 |
+| 1 | **Multi-Step Step 2** (Effect Type) | Enables cascade | 5-class classifier |
+| 2 | **Multi-Step Step 3** (Position) | Enables conditioned delta | Position ± 5nt |
+| 3 | **ConditionedDeltaPredictor** | Use cascade outputs! | r > 0.70 (vs 0.507) |
+| 4 | **Full SpliceVarDB** (50K) | Data scaling works | Better generalization |
+| 5 | **HyenaDNA encoder** | Better sequence understanding | +5-10% improvement |
+
+### ⭐ NEW: Cascade vs Standalone Insight
+
+**Current `ValidatedDelta` is standalone** (r=0.507) - it ignores Multi-Step outputs!
+
+```
+WRONG (current):  alt_seq → ValidatedDelta → Δ  (learns everything from scratch)
+RIGHT (proposed): alt_seq + effect_type + position → ConditionedDelta → Δ  (simpler task)
+```
+
+**Expected improvement**: r=0.507 → r>0.70 by conditioning on Steps 1-3 outputs.
 
 ### MEDIUM PRIORITY
 
