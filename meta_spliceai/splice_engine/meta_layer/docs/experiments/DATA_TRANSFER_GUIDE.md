@@ -11,13 +11,26 @@
 |------|------|----------|--------------|
 | **SpliceVarDB** | 6.8 MB | `meta_spliceai/splice_engine/case_studies/workflows/splicevardb/splicevardb.download.tsv` | ✅ All experiments |
 | **FASTA (GRCh38)** | 2.9 GB | `data/mane/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa` | ✅ Sequence extraction |
-| **Meta-models artifacts** | 2.2 GB | `data/mane/GRCh38/openspliceai_eval/meta_models/` | ⚠️ Only for artifact-based training |
-| **GTF annotations** | ~50 MB | `data/mane/GRCh38/MANE.GRCh38.v1.3.refseq_genomic.gtf` | ⚠️ Only for canonical classification |
+| **Meta-models artifacts** | 2.2 GB | `data/mane/GRCh38/openspliceai_eval/meta_models/` | ✅ **Required for artifact-based training** |
+| **GTF annotations** | ~50 MB | `data/mane/GRCh38/MANE.GRCh38.v1.3.refseq_genomic.gtf` | ❌ **Not needed if using precomputed artifacts** |
+
+### Important Notes
+
+**GTF/GFF Files**: If you're using **precomputed artifacts** (the `analysis_sequences_*.tsv` files), you **do NOT need** the GTF/GFF file. The labels from GTF annotations are already embedded in the artifacts (in the `splice_type` column). You'd only need GTF/GFF if you were regenerating artifacts from scratch.
+
+**Precomputed Artifacts**: These are **required** for artifact-based training with OpenSpliceAI. The artifacts contain:
+- Base model predictions (donor/acceptor/neither scores)
+- Derived features (position, context, etc.)
+- Ground truth labels (from GTF, already embedded)
+- Sequence windows (±250nt around each position)
 
 ### Minimum Transfer (~10 MB)
-For delta prediction (HyenaDNA, ValidatedDelta), you only need:
+For delta prediction (HyenaDNA, ValidatedDelta) **without artifact-based training**, you only need:
 - ✅ SpliceVarDB TSV (6.8 MB)
 - ✅ FASTA can be downloaded directly on RunPods (see Option 3)
+
+**For artifact-based training** (recommended), you also need:
+- ✅ Precomputed artifacts (2.2 GB) - see transfer instructions below
 
 ---
 
@@ -29,8 +42,8 @@ Your RunPods connection supports SCP (SSH over exposed TCP):
 
 ```bash
 # Connection details (update these from RunPods dashboard!)
-RUNPOD_HOST="213.192.2.86"
-RUNPOD_PORT="40195"
+RUNPOD_HOST="69.30.85.30"
+RUNPOD_PORT="22084"
 SSH_KEY="~/.ssh/id_ed25519"
 
 # 1. Create directories on RunPods first
@@ -48,26 +61,51 @@ scp -P ${RUNPOD_PORT} -i ${SSH_KEY} \
     ~/work/meta-spliceai/data/mane/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa \
     root@${RUNPOD_HOST}:/workspace/meta-spliceai/data/mane/GRCh38/
 
-# 4. (Optional) Transfer pre-computed artifacts
-scp -r -P ${RUNPOD_PORT} -i ${SSH_KEY} \
+# 4. Transfer pre-computed artifacts (REQUIRED for artifact-based training)
+#    Use rsync for better progress tracking and resumability
+echo "Transferring precomputed artifacts (2.2 GB - this will take 15-30 min)..."
+ssh -p ${RUNPOD_PORT} -i ${SSH_KEY} root@${RUNPOD_HOST} \
+    "mkdir -p /workspace/meta-spliceai/data/mane/GRCh38/openspliceai_eval"
+
+rsync -avz --progress \
+    -e "ssh -p ${RUNPOD_PORT} -i ${SSH_KEY}" \
     ~/work/meta-spliceai/data/mane/GRCh38/openspliceai_eval/meta_models/ \
-    root@${RUNPOD_HOST}:/workspace/meta-spliceai/data/mane/GRCh38/openspliceai_eval/
+    root@${RUNPOD_HOST}:/workspace/meta-spliceai/data/mane/GRCh38/openspliceai_eval/meta_models/
 ```
 
 ### Option 2: rsync (Better for Resumable Transfers)
 
-```bash
-# Sync specific directories with progress
-rsync -avz --progress \
-    -e "ssh -p 40195 -i ~/.ssh/id_ed25519" \
-    ~/work/meta-spliceai/meta_spliceai/splice_engine/case_studies/ \
-    root@213.192.2.86:/workspace/meta-spliceai/meta_spliceai/splice_engine/case_studies/
+**Recommended for large transfers** (artifacts, FASTA):
 
-# Sync FASTA file
+```bash
+# Connection details
+RUNPOD_HOST="69.30.85.30"
+RUNPOD_PORT="22084"
+SSH_KEY="~/.ssh/id_ed25519"
+
+# Create directories first
+ssh -p ${RUNPOD_PORT} -i ${SSH_KEY} root@${RUNPOD_HOST} "
+    mkdir -p /workspace/meta-spliceai/meta_spliceai/splice_engine/case_studies/workflows/splicevardb
+    mkdir -p /workspace/meta-spliceai/data/mane/GRCh38/openspliceai_eval
+"
+
+# Transfer SpliceVarDB
 rsync -avz --progress \
-    -e "ssh -p 40195 -i ~/.ssh/id_ed25519" \
+    -e "ssh -p ${RUNPOD_PORT} -i ${SSH_KEY}" \
+    ~/work/meta-spliceai/meta_spliceai/splice_engine/case_studies/workflows/splicevardb/splicevardb.download.tsv \
+    root@${RUNPOD_HOST}:/workspace/meta-spliceai/meta_spliceai/splice_engine/case_studies/workflows/splicevardb/
+
+# Transfer FASTA file (if not downloading on RunPods)
+rsync -avz --progress \
+    -e "ssh -p ${RUNPOD_PORT} -i ${SSH_KEY}" \
     ~/work/meta-spliceai/data/mane/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa \
-    root@213.192.2.86:/workspace/meta-spliceai/data/mane/GRCh38/
+    root@${RUNPOD_HOST}:/workspace/meta-spliceai/data/mane/GRCh38/
+
+# Transfer precomputed artifacts (REQUIRED for artifact-based training)
+rsync -avz --progress \
+    -e "ssh -p ${RUNPOD_PORT} -i ${SSH_KEY}" \
+    ~/work/meta-spliceai/data/mane/GRCh38/openspliceai_eval/meta_models/ \
+    root@${RUNPOD_HOST}:/workspace/meta-spliceai/data/mane/GRCh38/openspliceai_eval/meta_models/
 ```
 
 ### Option 3: Download FASTA Directly on RunPods (Recommended!)
@@ -168,6 +206,10 @@ ls -lh /workspace/meta-spliceai/meta_spliceai/splice_engine/case_studies/workflo
 ls -lh /workspace/meta-spliceai/data/mane/GRCh38/
 # Should show: Homo_sapiens.GRCh38.dna.primary_assembly.fa (~2.9GB)
 
+# Check precomputed artifacts (if transferred)
+ls -lh /workspace/meta-spliceai/data/mane/GRCh38/openspliceai_eval/meta_models/ | head -10
+# Should show: analysis_sequences_*.tsv files (many files, ~2.2GB total)
+
 # Test loading
 cd /workspace/meta-spliceai
 mamba activate metaspliceai
@@ -216,7 +258,12 @@ After transfer, your RunPods should have:
 ├── data/
 │   └── mane/
 │       └── GRCh38/
-│           └── Homo_sapiens.GRCh38.dna.primary_assembly.fa  ← REQUIRED (2.9GB)
+│           ├── Homo_sapiens.GRCh38.dna.primary_assembly.fa  ← REQUIRED (2.9GB)
+│           └── openspliceai_eval/
+│               └── meta_models/
+│                   ├── analysis_sequences_*.tsv  ← REQUIRED for artifact-based training (2.2GB)
+│                   ├── splice_errors_*.tsv
+│                   └── gene_manifest.tsv
 └── (rest of repo from git clone)
 ```
 

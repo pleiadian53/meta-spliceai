@@ -41,9 +41,9 @@ model = HyenaDNADeltaPredictor(
 | ValidatedDelta 50K (full) | ~50,000 | 16GB | 6-10h | MEDIUM |
 | SimpleCNN 50K | ~50,000 | 12GB | 4-6h | MEDIUM |
 
-**Current**: Only tested on 2,000 samples on M1 Mac
+**Current**: Tested on 8,000 samples on M1 Mac → r=0.507
 
-**Expected Improvement**: More data should improve generalization
+**Expected Improvement**: 8K→50K should yield +10-15% correlation (r→0.55+)
 
 ---
 

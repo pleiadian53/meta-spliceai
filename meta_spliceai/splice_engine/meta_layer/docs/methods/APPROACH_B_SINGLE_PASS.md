@@ -384,9 +384,16 @@ Key metrics:
 1. ✅ ~~Implement model~~ → `ValidatedDeltaPredictor`
 2. ✅ ~~Test with 2000 samples~~ → r=0.41
 3. ✅ ~~Scale to 8000 samples~~ → r=0.507
-4. **Pending**: Scale to full SpliceVarDB (~50K samples) on GPU
-5. **Pending**: Test with HyenaDNA encoder (GPU required)
-6. **Pending**: Cross-validation for robust estimates
+4. **Recommended**: Scale to full SpliceVarDB (~50K samples) on GPU
+   - Expected improvement: r=0.55-0.60 (+10-15% from 8K)
+   - Enables proper cross-validation
+   - Better statistical power for evaluation
+5. **Recommended**: Biological evaluation (see `docs/experiments/BIOLOGICAL_EVALUATION_PLAN.md`)
+   - Evaluate splice site peak detection
+   - Test variant-induced gain/loss detection
+   - More interpretable than correlation alone
+6. **Pending**: Test with HyenaDNA encoder (GPU required)
+7. **Pending**: Cross-validation for robust estimates
 
 ---
 
