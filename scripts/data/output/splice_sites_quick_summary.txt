@@ -1,0 +1,31 @@
+SPLICE SITES QUICK ANALYSIS SUMMARY
+===================================
+Generated: Sat Oct  4 17:52:10 EDT 2025
+Data source: /Users/pleiadian53/work/meta-spliceai/data/ensembl/splice_sites.tsv
+
+OVERVIEW STATISTICS
+------------------
+Total splice sites:      2,829,398
+Unique genes:           39,291
+Unique transcripts:     227,977
+Unique chromosomes:           35
+Avg transcripts/gene:   5.80
+Avg splice sites/gene:  72.0
+
+SPLICE SITE TYPE BREAKDOWN
+--------------------------
+donor     : 1,414,699 sites (50.0%)
+acceptor  : 1,414,699 sites (50.0%)
+
+TOP 10 GENES BY SPLICE SITE COUNT
+---------------------------------
+ENSG00000155657  :    7,614 sites
+ENSG00000145362  :    7,514 sites
+ENSG00000224078  :    5,546 sites
+ENSG00000006071  :    5,182 sites
+ENSG00000135317  :    4,644 sites
+ENSG00000197102  :    4,586 sites
+ENSG00000163913  :    4,462 sites
+ENSG00000068400  :    4,202 sites
+ENSG00000156113  :    4,176 sites
+ENSG00000198677  :    3,740 sites

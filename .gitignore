@@ -3,7 +3,9 @@
 # ============================================================================
 # Data files (large genomic data)
 # ============================================================================
-data/
+# Use leading slash to only match root-level data directory
+# (not package directories like meta_spliceai/.../data/)
+/data/
 *.tsv
 *.parquet
 *.fa
@@ -197,10 +199,20 @@ dev/
 dev/*
 
 # Experimental outputs and results (large files)
-experiments/
-output/
-results/
-models/
+# Use leading slash to only match root-level directories
+# (not package directories like meta_spliceai/.../models/)
+/experiments/
+/output/
+/results/
+/models/
+
+# Exception: meta_layer package directories (Python packages, not data storage)
+!meta_spliceai/splice_engine/meta_layer/data/
+!meta_spliceai/splice_engine/meta_layer/data/**
+!meta_spliceai/splice_engine/meta_layer/models/
+!meta_spliceai/splice_engine/meta_layer/models/**
+!meta_spliceai/splice_engine/openspliceai_recalibration/data/
+!meta_spliceai/splice_engine/openspliceai_recalibration/data/**
 
 # Exception: meta_layer documentation (should be public)
 !meta_spliceai/splice_engine/meta_layer/docs/
