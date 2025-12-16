@@ -202,6 +202,13 @@ output/
 results/
 models/
 
+# Exception: meta_layer documentation (should be public)
+!meta_spliceai/splice_engine/meta_layer/docs/
+!meta_spliceai/splice_engine/meta_layer/docs/experiments/
+!meta_spliceai/splice_engine/meta_layer/docs/experiments/**
+!meta_spliceai/splice_engine/meta_layer/docs/wishlist/
+!meta_spliceai/splice_engine/meta_layer/docs/wishlist/**
+
 # Case studies with large data
 tests/uORF_explorer/
 
