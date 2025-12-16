@@ -215,6 +215,16 @@ These are the benchmarks to beat on GPU:
 
 ## 🚀 Quick Start on RunPods
 
+### 0. Transfer Data First!
+
+Before training, you need to transfer data files that aren't in the git repo.
+
+**See**: [DATA_TRANSFER_GUIDE.md](./DATA_TRANSFER_GUIDE.md) for complete instructions.
+
+**Minimum required** (~10 MB to transfer, FASTA can be downloaded on RunPods):
+- `splicevardb.download.tsv` (6.8 MB) - SCP from local
+- `Homo_sapiens.GRCh38.dna.primary_assembly.fa` (2.9 GB) - Download from Ensembl
+
 ### 1. Setup Environment
 
 ```bash
@@ -439,4 +449,5 @@ if epoch % 5 == 0:
 ---
 
 *This guide enables AI agents to continue GPU-intensive experiments without needing access to dev/ directory.*
+
 
