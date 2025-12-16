@@ -1,0 +1,169 @@
+{
+  "metadata": {
+    "training_dataset": "train_pc_1000_3mers",
+    "total_genes": 63140,
+    "training_genes": 1002,
+    "genes_with_artifacts": 1003,
+    "artifact_directories": [
+      "/home/bchiu/work/meta-spliceai/data/ensembl/spliceai_eval/meta_models"
+    ]
+  },
+  "scenario1": {
+    "description": "Genes in training data with unseen positions (due to TN downsampling)",
+    "count": 6,
+    "genes": [
+      {
+        "gene_id": "ENSG00000048707",
+        "gene_name": "VPS13D",
+        "chrom": "1",
+        "gene_length": 282018,
+        "gene_type": "protein_coding"
+      },
+      {
+        "gene_id": "ENSG00000236172",
+        "gene_name": "MIR7515HG",
+        "chrom": "2",
+        "gene_length": 35716,
+        "gene_type": "lncRNA"
+      },
+      {
+        "gene_id": "ENSG00000225548",
+        "gene_name": "LINC01980",
+        "chrom": "3",
+        "gene_length": 134028,
+        "gene_type": "lncRNA"
+      },
+      {
+        "gene_id": "ENSG00000174227",
+        "gene_name": "PIGG",
+        "chrom": "4",
+        "gene_length": 40991,
+        "gene_type": "protein_coding"
+      },
+      {
+        "gene_id": "ENSG00000248994",
+        "gene_name": NaN,
+        "chrom": "5",
+        "gene_length": 188863,
+        "gene_type": "lncRNA"
+      },
+      {
+        "gene_id": "ENSG00000285756",
+        "gene_name": NaN,
+        "chrom": "X",
+        "gene_length": 120328,
+        "gene_type": "lncRNA"
+      }
+    ]
+  },
+  "scenario2a": {
+    "description": "Unseen genes (not in training) with existing artifacts",
+    "count": 8,
+    "genes": [
+      {
+        "gene_id": "ENSG00000134324",
+        "gene_name": "LPIN1",
+        "chrom": "2",
+        "gene_length": 149815,
+        "gene_type": "protein_coding"
+      },
+      {
+        "gene_id": "ENSG00000204121",
+        "gene_name": "ECEL1P1",
+        "chrom": "2",
+        "gene_length": 3999,
+        "gene_type": "unprocessed_pseudogene"
+      },
+      {
+        "gene_id": "ENSG00000224655",
+        "gene_name": "LINC01823",
+        "chrom": "2",
+        "gene_length": 30830,
+        "gene_type": "lncRNA"
+      },
+      {
+        "gene_id": "ENSG00000115935",
+        "gene_name": "WIPF1",
+        "chrom": "2",
+        "gene_length": 123345,
+        "gene_type": "protein_coding"
+      },
+      {
+        "gene_id": "ENSG00000135365",
+        "gene_name": "PHF21A",
+        "chrom": "11",
+        "gene_length": 192136,
+        "gene_type": "protein_coding"
+      },
+      {
+        "gene_id": "ENSG00000139974",
+        "gene_name": "SLC38A6",
+        "chrom": "14",
+        "gene_length": 133203,
+        "gene_type": "protein_coding"
+      },
+      {
+        "gene_id": "ENSG00000054523",
+        "gene_name": "KIF1B",
+        "chrom": "1",
+        "gene_length": 171034,
+        "gene_type": "protein_coding"
+      },
+      {
+        "gene_id": "ENSG00000267134",
+        "gene_name": "LINC01924",
+        "chrom": "18",
+        "gene_length": 382047,
+        "gene_type": "lncRNA"
+      }
+    ]
+  },
+  "scenario2b": {
+    "description": "Unseen genes (not in training) that are completely unprocessed",
+    "count": 6,
+    "genes": [
+      {
+        "gene_id": "ENSG00000284616",
+        "gene_name": NaN,
+        "chrom": "1",
+        "gene_length": 5467,
+        "gene_type": "lncRNA"
+      },
+      {
+        "gene_id": "ENSG00000115705",
+        "gene_name": "TPO",
+        "chrom": "2",
+        "gene_length": 169646,
+        "gene_type": "protein_coding"
+      },
+      {
+        "gene_id": "ENSG00000234661",
+        "gene_name": "CHL1-AS1",
+        "chrom": "3",
+        "gene_length": 22426,
+        "gene_type": "lncRNA"
+      },
+      {
+        "gene_id": "ENSG00000205959",
+        "gene_name": NaN,
+        "chrom": "4",
+        "gene_length": 34490,
+        "gene_type": "lncRNA"
+      },
+      {
+        "gene_id": "ENSG00000250921",
+        "gene_name": "LINC02063",
+        "chrom": "5",
+        "gene_length": 11792,
+        "gene_type": "lncRNA"
+      },
+      {
+        "gene_id": "ENSG00000167393",
+        "gene_name": "PPP2R3B",
+        "chrom": "X",
+        "gene_length": 53023,
+        "gene_type": "protein_coding"
+      }
+    ]
+  }
+}

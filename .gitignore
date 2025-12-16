@@ -307,7 +307,8 @@ test_output/
 # Base model evaluation outputs (e.g., SpliceAI, OpenSpliceAI, SpliceGNN, etc.)
 **/spliceai_eval/
 **/openspliceai_eval/
-**/meta_models/
+# Note: meta_models/ is a Python package (source code), not an output directory
+# It will be included by default; global patterns (*.zip, *.png, etc.) exclude non-source files
 
 # Exceptions: keep structure documentation
 !docs/**/spliceai_eval/

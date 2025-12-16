@@ -1,0 +1,18 @@
+# Template file for excluding features with high correlation to labels
+# These features have been identified as potentially leaky in previous analyses
+# Comment out lines to re-include these features in your model training
+
+# Transcript/gene metadata features (correlation ~0.94)
+missing_transcript_feats
+has_gene_info
+has_tx_info
+
+# Distance features with high correlation (correlation ~0.89)
+distance_to_start
+distance_to_end
+
+# Other features that might be problematic in certain contexts
+# splice_neither_logodds
+# avg_exon_length
+# median_exon_length
+# neither_score
