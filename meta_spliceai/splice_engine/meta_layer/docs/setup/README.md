@@ -13,7 +13,8 @@ See [RUNPODS_STORAGE_REQUIREMENTS.md](./RUNPODS_STORAGE_REQUIREMENTS.md) for det
 | Guide | Purpose | Audience |
 |-------|---------|----------|
 | [RUNPODS_COMPLETE_SETUP.md](./RUNPODS_COMPLETE_SETUP.md) | Complete RunPods VM setup including SSH, environment, data, and GitHub access | AI agents & developers |
-| [RUNPODS_STORAGE_REQUIREMENTS.md](./RUNPODS_STORAGE_REQUIREMENTS.md) | **Storage requirements and quota issues** | All |
+| [RUNPODS_DISK_CONFIGURATION.md](./RUNPODS_DISK_CONFIGURATION.md) | **⭐ How to configure Volume Disk size (step-by-step)** | All |
+| [RUNPODS_STORAGE_REQUIREMENTS.md](./RUNPODS_STORAGE_REQUIREMENTS.md) | Storage requirements and quota troubleshooting | All |
 
 ## Quick Links
 
