@@ -1,8 +1,23 @@
 # Complete RunPods Setup Guide for Meta-Layer GPU Training
 
 **Purpose**: Step-by-step guide for setting up a RunPods VM for GPU training  
-**Last Updated**: December 15, 2025  
+**Last Updated**: December 16, 2025  
 **Audience**: AI agents and human developers
+
+---
+
+## ⚠️ CRITICAL: Storage Requirements
+
+**Before creating a RunPods instance, ensure you have sufficient disk quota!**
+
+| Requirement | Value |
+|-------------|-------|
+| **Volume Disk** | **50GB minimum** (100GB recommended) |
+| GPU VRAM | 24GB+ (RTX 4090, A40, A100) |
+
+The `df -h` command shows **misleading** shared storage (515TB). Each pod has a **hidden individual quota**. A 20GB quota is insufficient!
+
+**See**: [RUNPODS_STORAGE_REQUIREMENTS.md](./RUNPODS_STORAGE_REQUIREMENTS.md) for details on storage errors.
 
 ---
 

@@ -2,11 +2,18 @@
 
 This directory contains guides for setting up different compute environments for meta-layer training.
 
+## ⚠️ IMPORTANT: Storage Requirements
+
+**RunPods instances need 50GB+ Volume Disk!** The default 20GB is insufficient.
+
+See [RUNPODS_STORAGE_REQUIREMENTS.md](./RUNPODS_STORAGE_REQUIREMENTS.md) for details.
+
 ## Available Guides
 
 | Guide | Purpose | Audience |
 |-------|---------|----------|
 | [RUNPODS_COMPLETE_SETUP.md](./RUNPODS_COMPLETE_SETUP.md) | Complete RunPods VM setup including SSH, environment, data, and GitHub access | AI agents & developers |
+| [RUNPODS_STORAGE_REQUIREMENTS.md](./RUNPODS_STORAGE_REQUIREMENTS.md) | **Storage requirements and quota issues** | All |
 
 ## Quick Links
 
