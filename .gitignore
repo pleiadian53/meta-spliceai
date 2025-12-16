@@ -300,6 +300,10 @@ tests/
 test_data/
 test_output/
 
+# Exception: meta_layer tests (needed for GPU experiment replication)
+!meta_spliceai/splice_engine/meta_layer/tests/
+!meta_spliceai/splice_engine/meta_layer/tests/*.py
+
 # Base model evaluation outputs (e.g., SpliceAI, OpenSpliceAI, SpliceGNN, etc.)
 **/spliceai_eval/
 **/openspliceai_eval/
