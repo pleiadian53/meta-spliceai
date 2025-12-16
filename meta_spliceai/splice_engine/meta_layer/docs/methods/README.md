@@ -9,8 +9,50 @@ This directory contains documentation for the various methodological approaches 
 | [ROADMAP.md](ROADMAP.md) | High-level methodology development roadmap | Active |
 | [APPROACH_A_PAIRED.md](APPROACH_A_PAIRED.md) | Siamese/paired delta prediction | Tested (r=0.38) |
 | [APPROACH_B_SINGLE_PASS.md](APPROACH_B_SINGLE_PASS.md) | Single-pass validated delta prediction | **BEST (r=0.507)** ⭐ |
+| [MULTI_STEP_FRAMEWORK.md](MULTI_STEP_FRAMEWORK.md) | Decomposed classification approach | ⭐ **Best for Interpretability** |
 | [GPU_REQUIREMENTS.md](GPU_REQUIREMENTS.md) | Compute resource guide | Active |
-| [MULTI_STEP_FRAMEWORK.md](../MULTI_STEP_FRAMEWORK.md) | Decomposed approach | In Progress |
+
+---
+
+## 🏆 Method Selection Guide
+
+### TL;DR: Which Method to Use?
+
+| Your Goal | Best Method | Why |
+|-----------|-------------|-----|
+| **"Should I investigate this variant?"** | Multi-Step Step 1 | Direct yes/no answer |
+| **"What kind of effect is this?"** | Multi-Step Step 2 | Donor gain/loss, Acceptor gain/loss |
+| **"Where should I target my ASO?"** | Multi-Step Step 3 | Position localization |
+| **"How strong is the effect?"** | ValidatedDelta | Continuous delta scores |
+| **"Rank variants by severity"** | ValidatedDelta | Quantitative ranking |
+| **"Explain to FDA/stakeholders"** | Multi-Step | Interpretable decision trail |
+
+### Two Complementary Approaches
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CHOOSING YOUR APPROACH                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  MULTI-STEP FRAMEWORK ⭐ (For Decisions & Interpretation)               │
+│  ─────────────────────────────────────────────────────────               │
+│  ✅ "Is this pathogenic?"                                               │
+│  ✅ "What type of effect?"                                              │
+│  ✅ "Where exactly?"                                                    │
+│  ✅ Explainable to regulators                                           │
+│  ⚠️ Step 1 needs improvement (AUC=0.61 → need >0.75)                   │
+│                                                                          │
+│  VALIDATEDDELTA ⭐ (For Quantification & Ranking)                       │
+│  ─────────────────────────────────────────────────                       │
+│  ✅ r=0.507 correlation (best quantitative)                             │
+│  ✅ Continuous delta scores                                              │
+│  ✅ Rank variants by effect magnitude                                   │
+│  ⚠️ Requires threshold for yes/no decisions                            │
+│                                                                          │
+│  RECOMMENDED: Use BOTH together for comprehensive analysis              │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Quick Reference
 
@@ -78,48 +120,79 @@ Step 4: How strong?         → Regression (NOT IMPLEMENTED)
 
 ### Which Methods Are Most Promising?
 
-| Method | Alternative Splice Sites | New Isoforms | Drug Targets | Why |
-|--------|-------------------------|--------------|--------------|-----|
-| **ValidatedDelta (B)** ⭐ | ✅ Best | ✅ Good | ✅ Best | Quantitative delta scores enable ranking |
-| Multi-Step Framework | ✅ Good | ⚠️ Limited | ✅ Good | Binary decisions for triage |
-| Paired Delta (A) | ⚠️ Moderate | ⚠️ Limited | ⚠️ Moderate | Noisy targets limit accuracy |
+| Method | Triage | Effect Type | Position | Quantification | Explainability |
+|--------|--------|-------------|----------|----------------|----------------|
+| **Multi-Step** ⭐ | ✅ Best | ✅ Best | ✅ Best | ⚠️ Indirect | ✅ **Best** |
+| **ValidatedDelta** ⭐ | ⚠️ Threshold | ⚠️ Derived | ⚠️ Max pos | ✅ Best | ⚠️ Numbers only |
+| Paired Delta (A) | ⚠️ Poor | ⚠️ Derived | ⚠️ Noisy | ⚠️ r=0.38 | ❌ Poor |
 
-### Why ValidatedDelta is Best for Drug Discovery
+### Why Multi-Step is Critical for Drug Discovery
 
-1. **Quantitative Predictions**: Delta scores (not just yes/no) let you rank variants by effect magnitude
-2. **Both Gains AND Losses**: Detects donor/acceptor gains and losses (4 effect types)
-3. **Ground-Truth Training**: Uses SpliceVarDB-validated labels, not potentially wrong base model predictions
-4. **Scalable**: More data → better results. Full SpliceVarDB should achieve r>0.60
+1. **Regulatory Approval**: FDA requires mechanistic understanding
+   - ✅ "This variant is pathogenic because it creates a new donor site at position 127"
+   - ❌ "Δ_donor = 0.35" (what does this mean?)
 
-### Workflow for Drug Target Discovery
+2. **ASO Target Design**: Need to know WHERE to target
+   - ✅ Multi-Step Step 3 gives position localization
+   - ❌ ValidatedDelta gives max delta position (indirect)
+
+3. **Clinical Decisions**: Binary yes/no for treatment decisions
+   - ✅ Multi-Step: "P(splice-altering) = 0.92 → TREAT"
+   - ❌ ValidatedDelta: "Δ = 0.35 → ??? → need threshold → TREAT?"
+
+### Recommended Workflow: Combined Approach
 
 ```
-1. Screen candidate variants
-   └─→ ValidatedDeltaPredictor: Get delta scores
+RNA THERAPEUTICS VARIANT SCREENING PIPELINE
+────────────────────────────────────────────
 
-2. Prioritize by effect magnitude
-   └─→ Sort by |Δ_donor| + |Δ_acceptor|
-
-3. Identify effect type
-   └─→ Δ_donor > 0.1 = "Donor gain" (new splice site)
-   └─→ Δ_donor < -0.1 = "Donor loss" (lost splice site)
-   └─→ Similar for acceptor
-
-4. Predict new isoforms
-   └─→ Donor gain + nearby acceptor = potential new exon
-   └─→ Donor loss = potential exon skipping
-
-5. Validate top candidates
-   └─→ RNA-seq, minigene assays
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: TRIAGE (Multi-Step Step 1)                                    │
+│  Input:  10,000 candidate variants                                      │
+│  Filter: P(splice-altering) > 0.5                                       │
+│  Output: 1,000 high-priority variants                                   │
+│  Time:   ~1 minute                                                      │
+└──────────────────────────────┬──────────────────────────────────────────┘
+                               ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PHASE 2: EFFECT TYPING (Multi-Step Step 2)                             │
+│  Input:  1,000 high-priority variants                                   │
+│  Output: Classified by effect type                                      │
+│    - 400 Donor gain (new cryptic donors)                                │
+│    - 200 Donor loss (exon skipping)                                     │
+│    - 250 Acceptor gain/loss                                             │
+│    - 150 Complex                                                        │
+└──────────────────────────────┬──────────────────────────────────────────┘
+                               ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PHASE 3: QUANTIFICATION (ValidatedDelta)                               │
+│  Input:  1,000 classified variants                                      │
+│  Output: Delta scores [Δ_donor, Δ_acceptor]                             │
+│  Use:    Rank by |Δ| for prioritization                                 │
+└──────────────────────────────┬──────────────────────────────────────────┘
+                               ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PHASE 4: LOCALIZATION (Multi-Step Step 3) [FUTURE]                     │
+│  Input:  Top 100 candidates (by delta magnitude)                        │
+│  Output: Exact affected positions ± 5nt                                 │
+│  Use:    Design 18-25mer ASO targeting this position                    │
+└──────────────────────────────┬──────────────────────────────────────────┘
+                               ↓
+┌─────────────────────────────────────────────────────────────────────────┐
+│  PHASE 5: EXPERIMENTAL VALIDATION                                       │
+│  Methods: RNA-seq, minigene assays, RT-PCR                              │
+│  Top 10 candidates → wet lab                                            │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Limitations & Future Work
+### Limitations & Next Steps
 
-| Limitation | Impact | Mitigation |
-|------------|--------|------------|
-| Current r=0.507 | ~50% variance explained | Scale to 50K samples, use HyenaDNA |
-| Point mutations only | Doesn't handle indels well | Extend architecture |
-| Position-agnostic | Doesn't predict WHERE the new site is | Multi-Step Framework Step 3 |
+| Limitation | Impact | Solution | Priority |
+|------------|--------|----------|----------|
+| Step 1 AUC=0.61 | Triage accuracy | More data, HyenaDNA | ⭐ HIGH |
+| Step 2 not tested | No effect typing | Run experiments | MEDIUM |
+| Step 3 not implemented | No localization | Build model | ⭐ HIGH |
+| r=0.507 for ValidatedDelta | ~50% variance explained | Scale to 50K | HIGH |
 
 ---
 

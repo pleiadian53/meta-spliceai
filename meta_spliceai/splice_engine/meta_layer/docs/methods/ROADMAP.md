@@ -48,23 +48,28 @@ Base models are trained on canonical splice sites and fail to capture many varia
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │ MULTI-STEP FRAMEWORK (Decomposed Problem)                              │  │
+│  │ MULTI-STEP FRAMEWORK (Decomposed Problem) ⭐ BEST FOR INTERPRETABILITY │  │
 │  │                                                                        │  │
 │  │ Step 1: Binary Classification                                         │  │
 │  │   • "Is this variant splice-altering?"                                │  │
 │  │   • Status: Tested, AUC=0.61, F1=0.53 (needs >0.7)                   │  │
+│  │   • Value: Triage 10K variants → 1K candidates                        │  │
 │  │                                                                        │  │
 │  │ Step 2: Effect Type Classification                                    │  │
 │  │   • "What type of effect?" (gain/loss, donor/acceptor)               │  │
-│  │   • Status: NOT YET IMPLEMENTED                                       │  │
+│  │   • Status: Implemented, NOT YET TESTED                               │  │
+│  │   • Value: Guides ASO design strategy                                 │  │
 │  │                                                                        │  │
 │  │ Step 3: Position Localization                                         │  │
 │  │   • "Where in the window is the effect?"                              │  │
 │  │   • Status: NOT YET IMPLEMENTED                                       │  │
+│  │   • Value: ⭐ CRITICAL for ASO target design (exact position)         │  │
 │  │                                                                        │  │
 │  │ Step 4: Delta Magnitude                                               │  │
 │  │   • "How strong is the effect at that position?"                      │  │
-│  │   • Status: NOT YET IMPLEMENTED                                       │  │
+│  │   • Status: Use ValidatedDelta instead                                │  │
+│  │                                                                        │  │
+│  │ WHY IMPORTANT: Provides INTERPRETABLE decisions for FDA/stakeholders  │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -247,25 +252,38 @@ Final score = base_scores + Δ
 
 1. ~~**Implement Approach B** (Single-Pass Delta)~~ → r=0.507 with 8000 samples
 2. ~~**More training data**~~ → Confirmed: +24% improvement with 4x data
+3. ~~**Multi-Step Step 1**~~ → AUC=0.61 (implemented, needs improvement)
 
-### Remaining (M1 Mac)
+### HIGH PRIORITY ⭐
 
-1. **Longer context experiment** (1001nt vs 501nt)
-   - Test already implemented, pending run
-2. **Attention variant** for interpretability
-   - Test already implemented, pending run
+| Priority | Task | Why Important | Expected Outcome |
+|----------|------|---------------|------------------|
+| 1 | **Full SpliceVarDB** (50K) | Data scaling works | r > 0.60 |
+| 2 | **Multi-Step Step 2** (Effect Type) | Guides ASO design | 5-class classifier |
+| 3 | **Multi-Step Step 3** (Position) | ASO target selection | Position ± 5nt |
+| 4 | **HyenaDNA encoder** | Better sequence understanding | r > 0.65 |
 
-### With GPU (RunPods) - High Priority
+### MEDIUM PRIORITY
 
-1. **Full SpliceVarDB** (~50K variants) - Expected: r > 0.60
-2. **HyenaDNA encoder** for ValidatedDeltaPredictor
-3. **Cross-validation** on larger scale
+| Priority | Task | Why Important | Expected Outcome |
+|----------|------|---------------|------------------|
+| 5 | **Improve Multi-Step Step 1** | Better triage | AUC > 0.75, F1 > 0.7 |
+| 6 | **Longer context** (1001nt) | Distant regulatory elements | +5-10% improvement |
+| 7 | **Cross-validation** | Robust estimates | Variance estimates |
 
-### Lower Priority
+### Why Multi-Step is High Priority
 
-4. **Improve Multi-Step Step 1** (Binary Classification)
-   - Current: AUC=0.61, F1=0.53
-   - Target: F1 > 0.7
+Multi-Step Framework provides **interpretable outputs** that ValidatedDelta cannot:
+
+```
+FDA/Stakeholder Question          ValidatedDelta     Multi-Step
+─────────────────────────────     ──────────────     ───────────
+"Is this variant pathogenic?"     "Δ=0.35...???"     "YES (92%)" ✅
+"What type of effect?"            "Δ_donor=0.35"     "Donor gain" ✅
+"Where should we target ASO?"     "max at pos 127"   "pos 127 ± 3nt" ✅
+```
+
+For clinical/regulatory approval, **you need to explain your predictions**.
 
 ---
 
