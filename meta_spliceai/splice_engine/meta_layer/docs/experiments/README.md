@@ -108,8 +108,9 @@ Names are descriptive but concise:
 
 For experiments requiring GPU resources, see:
 
-- [GPU_TRAINING_GUIDE.md](./GPU_TRAINING_GUIDE.md) - **Jump-start GPU training on RunPods**
-- [DATA_TRANSFER_GUIDE.md](./DATA_TRANSFER_GUIDE.md) - **Transfer required data files**
+- [../setup/RUNPODS_COMPLETE_SETUP.md](../setup/RUNPODS_COMPLETE_SETUP.md) - **⭐ Complete VM setup (SSH, env, data, GitHub)**
+- [GPU_TRAINING_GUIDE.md](./GPU_TRAINING_GUIDE.md) - Jump-start GPU training
+- [DATA_TRANSFER_GUIDE.md](./DATA_TRANSFER_GUIDE.md) - Transfer required data files
 - [../wishlist/GPU_EXPERIMENTS.md](../wishlist/GPU_EXPERIMENTS.md) - Experiment queue
 
 ### Priority GPU Experiments

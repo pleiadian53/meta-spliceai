@@ -215,11 +215,17 @@ These are the benchmarks to beat on GPU:
 
 ## 🚀 Quick Start on RunPods
 
-### 0. Transfer Data First!
+### 0. Complete Setup First!
 
-Before training, you need to transfer data files that aren't in the git repo.
+Before training, follow the complete setup guide:
 
-**See**: [DATA_TRANSFER_GUIDE.md](./DATA_TRANSFER_GUIDE.md) for complete instructions.
+**See**: [../setup/RUNPODS_COMPLETE_SETUP.md](../setup/RUNPODS_COMPLETE_SETUP.md) for:
+- SSH key setup
+- Environment installation
+- Data transfer
+- GitHub authentication (for pushing results)
+
+**Data Transfer Only**: [DATA_TRANSFER_GUIDE.md](./DATA_TRANSFER_GUIDE.md)
 
 **Minimum required** (~10 MB to transfer, FASTA can be downloaded on RunPods):
 - `splicevardb.download.tsv` (6.8 MB) - SCP from local

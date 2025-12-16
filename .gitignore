@@ -208,11 +208,15 @@ dev/*
 
 # Exception: meta_layer package directories (Python packages, not data storage)
 !meta_spliceai/splice_engine/meta_layer/data/
-!meta_spliceai/splice_engine/meta_layer/data/**
+!meta_spliceai/splice_engine/meta_layer/data/*.py
 !meta_spliceai/splice_engine/meta_layer/models/
-!meta_spliceai/splice_engine/meta_layer/models/**
+!meta_spliceai/splice_engine/meta_layer/models/*.py
 !meta_spliceai/splice_engine/openspliceai_recalibration/data/
-!meta_spliceai/splice_engine/openspliceai_recalibration/data/**
+!meta_spliceai/splice_engine/openspliceai_recalibration/data/*.py
+# Still ignore __pycache__ in excepted directories
+meta_spliceai/splice_engine/meta_layer/data/__pycache__/
+meta_spliceai/splice_engine/meta_layer/models/__pycache__/
+meta_spliceai/splice_engine/openspliceai_recalibration/data/__pycache__/
 
 # Exception: meta_layer documentation (should be public)
 !meta_spliceai/splice_engine/meta_layer/docs/
