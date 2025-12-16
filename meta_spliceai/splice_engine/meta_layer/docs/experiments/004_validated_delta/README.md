@@ -1,7 +1,7 @@
 # Experiment 004: Validated Delta Prediction (Single-Pass)
 
-**Date**: December 15, 2025  
-**Status**: Completed  
+**Date**: December 15-16, 2025  
+**Status**: ✅ Completed (Best Result: r=0.507)  
 **Model**: `ValidatedDeltaPredictor`
 
 ---
@@ -68,30 +68,56 @@ Note: Δ_neither typically mirrors the sum of Δ_donor and Δ_acceptor
 
 ---
 
-## Results
+## Results Summary
 
-### Correlation (Splice-altering samples only)
+### Best Result: More Data (8000 samples) ⭐
 
-| Model | Pearson r | p-value |
-|-------|-----------|---------|
-| Paired (Siamese) | 0.38 | - |
-| **Validated (Single-Pass)** | **0.41** | 1.4e-07 |
+| Metric | Value |
+|--------|-------|
+| **Pearson Correlation** | **r = 0.507** |
+| ROC-AUC | 0.589 |
+| PR-AUC (AP) | 0.633 |
+| Detection Rate @ 0.1 | 16.8% |
+| False Positive Rate | 4.8% |
 
-**Improvement: +8% correlation**
+**Key Finding**: Scaling from 2000 → 8000 samples improved correlation by **+24%** (0.41 → 0.507).
+
+---
+
+## Detailed Results
+
+### Experiment Comparison
+
+| Experiment | Samples | Correlation | ROC-AUC | PR-AUC | Detection |
+|------------|---------|-------------|---------|--------|-----------|
+| Baseline (2000) | 2,000 | r=0.41 | 0.58 | 0.62 | 18.7% |
+| **More Data (8000)** | 8,000 | **r=0.507** | **0.589** | **0.633** | 16.8% |
+| Longer Context (1001nt) | 2,000 | *Pending* | - | - | - |
+| With Attention | 2,000 | *Pending* | - | - | - |
+
+### Correlation Improvement Trajectory
+
+```
+Paired Prediction (Siamese):     r = 0.38
+Validated Delta (2000 samples):  r = 0.41  (+8%)
+Validated Delta (8000 samples):  r = 0.507 (+24% from baseline)
+```
 
 ### Binary Discrimination (SA vs Normal)
 
-| Metric | Value |
-|--------|-------|
-| ROC-AUC | 0.58 |
-| PR-AUC | 0.62 |
+| Metric | 2000 samples | 8000 samples |
+|--------|--------------|--------------|
+| ROC-AUC | 0.58 | **0.589** |
+| PR-AUC | 0.62 | **0.633** |
 
 ### Detection at Threshold=0.1
 
-| Metric | Value |
-|--------|-------|
-| SA detected | 18.7% |
-| False positives | 6.0% |
+| Metric | 2000 samples | 8000 samples |
+|--------|--------------|--------------|
+| SA detected | 18.7% | 16.8% |
+| False positives | 6.0% | **4.8%** |
+
+Note: Lower detection rate with lower false positive rate suggests better calibration.
 
 ---
 
@@ -129,6 +155,8 @@ Note: Δ_neither typically mirrors the sum of Δ_donor and Δ_acceptor
 
 ## Training Configuration
 
+### Baseline (2000 samples)
+
 ```python
 # Data
 samples = 2000 (balanced: 1000 SA, 1000 Normal)
@@ -147,6 +175,27 @@ batch_size = 32
 optimizer = AdamW(lr=5e-5, weight_decay=0.02)
 scheduler = OneCycleLR(max_lr=5e-4)
 ```
+
+### Best Result: More Data (8000 samples) ⭐
+
+```python
+# Data
+samples = 8000 (balanced: 4000 SA, 4000 Normal)
+context_size = 501 nt
+test_samples = 500
+
+# Model (same architecture)
+hidden_dim = 128
+n_layers = 6
+dropout = 0.1
+use_attention = False
+
+# Training
+epochs = 50  # More epochs for larger dataset
+batch_size = 64
+```
+
+**Checkpoint saved**: `validated_delta_more_data_8000.pt`
 
 ---
 
@@ -189,11 +238,17 @@ Loss continues to decrease, suggesting more epochs or data could help.
 
 ## Recommendations
 
+### Validated Findings ✅
+
 1. **Use validated targets** for any delta prediction task
-2. **Increase training data**: 2000 samples is limited
-3. **Try longer context**: 501nt → 1001nt
-4. **Add position attention** for interpretability
-5. **Scale with HyenaDNA** on GPU
+2. **More data significantly helps**: 2000 → 8000 samples = +24% correlation
+
+### Pending Experiments (GPU Required)
+
+3. **Scale to full SpliceVarDB (~50K samples)** - Expected: r > 0.60
+4. **Try longer context**: 501nt → 1001nt
+5. **Add position attention** for interpretability
+6. **Scale with HyenaDNA encoder** on GPU
 
 ---
 
@@ -202,9 +257,29 @@ Loss continues to decrease, suggesting more epochs or data could help.
 | File | Description |
 |------|-------------|
 | `models/validated_delta_predictor.py` | Model implementation |
+| `tests/test_validated_delta_experiments.py` | Experiment runner |
 | `docs/methods/APPROACH_B_SINGLE_PASS.md` | Design rationale |
+
+### Saved Checkpoints
+
+| Checkpoint | Samples | Correlation |
+|------------|---------|-------------|
+| `validated_delta_more_data_8000.pt` | 8000 | **r=0.507** |
 
 ---
 
-*This approach is now the recommended method for delta prediction.*
+## Next Steps (RunPods GPU)
+
+```bash
+# Run remaining experiments on GPU
+python -m meta_spliceai.splice_engine.meta_layer.tests.test_validated_delta_experiments --exp longer_context
+python -m meta_spliceai.splice_engine.meta_layer.tests.test_validated_delta_experiments --exp attention
+
+# Or scale to full dataset (modify test file)
+# max_train = 50000
+```
+
+---
+
+*This approach is the recommended method for delta prediction. The correlation improvement from r=0.41 to r=0.507 with more data suggests further scaling will be beneficial.*
 

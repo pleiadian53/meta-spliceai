@@ -11,7 +11,7 @@ This directory contains documentation for experiments conducted on the meta-laye
 | [001](./001_canonical_classification/) | Canonical Classification | ✅ Completed | Partial Success | 2025-12-14 |
 | [002](./002_delta_prediction/) | Delta Prediction (Paired) | ✅ Completed | r=0.38 (insufficient) | 2025-12-14 |
 | [003](./003_binary_classification/) | Binary Classification (Multi-Step Step 1) | ✅ Completed | AUC=0.61, F1=0.53 | 2025-12-15 |
-| [004](./004_validated_delta/) | **Validated Delta (Single-Pass)** | ✅ Completed | **r=0.41 (best!)** | 2025-12-15 |
+| [004](./004_validated_delta/) | **Validated Delta (Single-Pass)** | ✅ Completed | **r=0.507 (best!)** ⭐ | 2025-12-16 |
 
 ---
 
@@ -80,6 +80,8 @@ Names are descriptive but concise:
 | Task | Best Model | Metric | Value |
 |------|------------|--------|-------|
 | Classification | Meta-Layer (001) | Accuracy | 99.11% |
+| **Delta Prediction** | **ValidatedDelta (8K)** ⭐ | **Correlation** | **r=0.507** |
+| Delta Prediction | ValidatedDelta (8K) | PR-AUC | 0.633 |
 | Variant Detection | Base Model | Detection Rate | 67% |
 
 ### Key Findings
@@ -89,6 +91,7 @@ Names are descriptive but concise:
 3. **Architecture matters**: Position-centric output limits variant analysis
 4. **Target quality matters**: Learning from potentially wrong base model deltas limits Approach A
 5. **Binary classification is learnable**: AUC=0.61 > random, but F1=0.53 needs improvement (>0.7)
+6. **More data significantly helps** ⭐: 2000→8000 samples improved correlation by +24% (r=0.41→0.507)
 
 ---
 
