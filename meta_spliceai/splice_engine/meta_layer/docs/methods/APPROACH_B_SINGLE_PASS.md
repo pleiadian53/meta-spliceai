@@ -1,8 +1,8 @@
 # Approach B: Single-Pass Delta Prediction
 
-**Status**: PROPOSED (Not Yet Implemented)  
-**Priority**: HIGH  
-**Last Updated**: December 15, 2025
+**Status**: ✅ IMPLEMENTED & TESTED (Best Result: r=0.507) ⭐  
+**Implementation**: `ValidatedDeltaPredictor`  
+**Last Updated**: December 16, 2025
 
 ---
 
@@ -345,26 +345,50 @@ Key metrics:
 
 ---
 
-## Relationship to Current Implementation
+## Implementation Status ✅
 
-**What was implemented as "Approach B" (incorrectly):**
-- `SpliceInducingClassifier` → Binary classification
-- This is actually **Step 1 of Multi-Step Framework**
+**Implemented as**: `ValidatedDeltaPredictor` in `models/validated_delta_predictor.py`
 
-**True Approach B (to be implemented):**
-- `ApproachBDeltaPredictor` → Delta regression
-- Single-pass, SpliceVarDB-validated targets
+### Results by Dataset Size
+
+| Samples | Correlation | ROC-AUC | PR-AUC |
+|---------|-------------|---------|--------|
+| 2,000 | r=0.41 | 0.58 | 0.62 |
+| **8,000** | **r=0.507** | **0.589** | **0.633** |
+
+**Key Finding**: Scaling from 2000 → 8000 samples improved correlation by **+24%**.
+
+### Comparison to Approach A
+
+| Aspect | Approach A (Paired) | Approach B (ValidatedDelta) |
+|--------|---------------------|----------------------------|
+| Correlation | r=0.38 | **r=0.507** (+33%) |
+| Target source | Base model (noisy) | SpliceVarDB-validated |
+| Forward passes | 2 | 1 |
+| Inference speed | Slower | Faster |
+
+---
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `models/validated_delta_predictor.py` | Model implementation |
+| `tests/test_validated_delta_experiments.py` | Experiment runner |
+| `docs/experiments/004_validated_delta/` | Results documentation |
 
 ---
 
 ## Next Steps
 
-1. Implement `ApproachBDeltaPredictor` model
-2. Create `ApproachBDataset` with validated delta targets
-3. Compare to Approach A (paired prediction)
-4. Evaluate on held-out variants
+1. ✅ ~~Implement model~~ → `ValidatedDeltaPredictor`
+2. ✅ ~~Test with 2000 samples~~ → r=0.41
+3. ✅ ~~Scale to 8000 samples~~ → r=0.507
+4. **Pending**: Scale to full SpliceVarDB (~50K samples) on GPU
+5. **Pending**: Test with HyenaDNA encoder (GPU required)
+6. **Pending**: Cross-validation for robust estimates
 
 ---
 
-*This document is part of the meta_layer methodology documentation.*
+*This approach is now the recommended method for delta prediction. See `docs/experiments/004_validated_delta/` for detailed results.*
 

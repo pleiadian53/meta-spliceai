@@ -1,6 +1,7 @@
 # GPU Resource Requirements for Meta-Layer Methods
 
 **Created**: December 15, 2025  
+**Updated**: December 16, 2025  
 **Purpose**: Guide for deciding which experiments to run locally vs. on RunPods
 
 ---
@@ -121,10 +122,11 @@ BATCH_SIZE = 256   # vs 32-64 on M1
 - Runs in ~30 min for 2000 samples
 - Already tested and works well
 
-### ✅ ValidatedDeltaPredictor
+### ✅ ValidatedDeltaPredictor ⭐ BEST
 - Same architecture as SimpleCNN
 - Uses validated targets from SpliceVarDB
-- Best correlation so far (r=0.41)
+- **Best correlation: r=0.507 (8000 samples)**
+- Key finding: More data → better results (+24% with 4x data)
 
 ### ✅ SpliceInducingClassifier
 - Binary classification (simpler task)
