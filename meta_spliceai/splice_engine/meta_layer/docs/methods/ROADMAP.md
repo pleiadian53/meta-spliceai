@@ -281,9 +281,9 @@ RIGHT (proposed): alt_seq + effect_type + position → ConditionedDelta → Δ  
 
 | Priority | Task | Why Important | Expected Outcome |
 |----------|------|---------------|------------------|
-| 5 | **Improve Multi-Step Step 1** | Better triage | AUC > 0.75, F1 > 0.7 |
-| 6 | **Longer context** (1001nt) | Distant regulatory elements | +5-10% improvement |
-| 7 | **Cross-validation** | Robust estimates | Variance estimates |
+| 6 | **Improve Multi-Step Step 1** | Better triage | AUC > 0.75, F1 > 0.7 |
+| 7 | **Longer context** (1001nt) | Distant regulatory elements | +5-10% improvement |
+| 8 | **Cross-validation** | Robust estimates | Variance estimates |
 
 ### Why Multi-Step is High Priority
 
