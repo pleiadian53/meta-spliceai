@@ -8,6 +8,19 @@ by the meta-layer.
 | Document | Description |
 |----------|-------------|
 | [SPLICEVARDB.md](SPLICEVARDB.md) | SpliceVarDB dataset and label derivation |
+| [HGVS_TUTORIAL.md](HGVS_TUTORIAL.md) | HGVS notation tutorial (CDS, exons, coordinate systems) |
+
+## Future Directions
+
+| Document | Description |
+|----------|-------------|
+| [../wishlist/ABERRANT_SPLICE_SITE_ANNOTATIONS.md](../wishlist/ABERRANT_SPLICE_SITE_ANNOTATIONS.md) | Roadmap for augmenting annotations with precise aberrant splice sites |
+
+### The Annotation Gap
+
+Current databases (SpliceVarDB, ClinVar) provide variant **classification** but not precise 
+**aberrant splice site coordinates**. See the wishlist document for a roadmap to address this 
+by extracting coordinates from MutSpliceDB, Snaptron, and GTEx sQTL data.
 
 ## Quick Reference
 
