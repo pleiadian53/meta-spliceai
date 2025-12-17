@@ -1,6 +1,7 @@
 name: metaspliceai
 channels:
   - conda-forge
+  - bioconda
   - defaults
 dependencies:
   - python=3.10
@@ -15,13 +16,14 @@ dependencies:
   - scikit-learn=1.5.*
   - xgboost=1.7.*
   - statsmodels=0.14.*
-  # Deep Learning Frameworks (will be upgraded to CUDA version)
-  - pytorch>=2.0
-  - torchvision
+  # Deep Learning Frameworks (installed via pip with CUDA - see setup guide)
+  # - pytorch>=2.0  # Installed via pip with CUDA support
+  # - torchvision   # Installed via pip with CUDA support
   # Visualization
   - plotly>=6.0
   # System tools
   - bedtools  # For pybedtools
+  - zlib  # Required for pybedtools compilation
   - pip:
       - argcomplete==3.5.2
       - argh==0.31.3
