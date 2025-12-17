@@ -3,10 +3,13 @@ SpliceVarDB loader for meta-layer variant-effect evaluation.
 
 This module loads SpliceVarDB variants and prepares them for
 evaluating the meta-layer's ability to detect variant effects on splicing.
+
+Includes HGVS parsing for extracting splice site position hints.
 """
 
 import logging
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Tuple
 
@@ -59,6 +62,152 @@ DEFAULT_SPLICEVARDB_PATH = _find_splicevardb_path()
 
 
 @dataclass
+class HGVSPositionHint:
+    """
+    Position hints extracted from HGVS notation.
+    
+    HGVS notation encodes information about the variant's position relative
+    to exon boundaries, which can help infer which splice site is affected.
+    
+    Examples
+    --------
+    c.670-1G>T   → 1 base before exon start = near ACCEPTOR site
+    c.1092+2T>A  → 2 bases after exon end   = near DONOR site
+    c.1018-550A>G → 550 bases into intron   = deep intronic (cryptic?)
+    c.1234A>G    → exonic position          = may affect ESE/ESS
+    """
+    
+    # Inferred splice site type based on position
+    site_type: str  # 'donor', 'acceptor', 'deep_intronic', 'exonic', 'unknown'
+    
+    # Distance from exon boundary (None for exonic variants)
+    distance_from_boundary: Optional[int] = None
+    
+    # Direction: '+' means after exon (donor side), '-' means before exon (acceptor side)
+    direction: Optional[str] = None
+    
+    # CDS position (the number before +/- in HGVS notation)
+    cds_position: Optional[int] = None
+    
+    # Whether this is in a canonical splice region (±2bp from exon boundary)
+    is_canonical_region: bool = False
+    
+    # Whether this is in the extended splice region (±10bp)
+    is_extended_region: bool = False
+    
+    # Confidence: how reliable is this hint?
+    confidence: str = 'low'  # 'high', 'medium', 'low'
+    
+    # Raw pattern match (for debugging)
+    raw_match: Optional[str] = None
+
+
+def parse_hgvs_position_hint(hgvs: str) -> HGVSPositionHint:
+    """
+    Extract position hints from HGVS notation.
+    
+    HGVS notation follows patterns like:
+    - c.670-1G>T    : 1 base into intron, before exon (acceptor side)
+    - c.1092+2T>A   : 2 bases into intron, after exon (donor side)
+    - c.1018-550A>G : 550 bases into intron (deep intronic)
+    - c.1234A>G     : exonic position
+    
+    Parameters
+    ----------
+    hgvs : str
+        HGVS notation string (e.g., "NM_194292.3:c.670-1G>T")
+    
+    Returns
+    -------
+    HGVSPositionHint
+        Parsed position information
+    
+    Examples
+    --------
+    >>> hint = parse_hgvs_position_hint("NM_194292.3:c.670-1G>T")
+    >>> print(hint.site_type)  # 'acceptor'
+    >>> print(hint.distance_from_boundary)  # 1
+    >>> print(hint.is_canonical_region)  # True
+    """
+    # Default: unknown
+    result = HGVSPositionHint(site_type='unknown', confidence='low')
+    
+    if not hgvs or not isinstance(hgvs, str):
+        return result
+    
+    # Pattern for intronic variants: c.XXX+N or c.XXX-N
+    # Examples: c.670-1G>T, c.1092+2T>A, c.1018-550A>G
+    intronic_pattern = r'c\.(\d+)([+-])(\d+)'
+    intronic_match = re.search(intronic_pattern, hgvs)
+    
+    if intronic_match:
+        cds_position = int(intronic_match.group(1))
+        direction = intronic_match.group(2)  # '+' or '-'
+        distance = int(intronic_match.group(3))
+        
+        result.cds_position = cds_position
+        result.direction = direction
+        result.distance_from_boundary = distance
+        result.raw_match = intronic_match.group(0)
+        
+        # Determine site type based on direction
+        if direction == '+':
+            # After exon = intron on donor side (5' end of intron)
+            # Canonical donor: positions +1, +2 (GT)
+            # Extended donor: positions +3 to +6
+            if distance <= 2:
+                result.site_type = 'donor'
+                result.is_canonical_region = True
+                result.is_extended_region = True
+                result.confidence = 'high'
+            elif distance <= 10:
+                result.site_type = 'donor'
+                result.is_canonical_region = False
+                result.is_extended_region = True
+                result.confidence = 'medium'
+            else:
+                result.site_type = 'deep_intronic'
+                result.confidence = 'low'
+        else:  # direction == '-'
+            # Before exon = intron on acceptor side (3' end of intron)
+            # Canonical acceptor: positions -1, -2 (AG)
+            # Extended acceptor: positions -3 to ~-25 (branch point region)
+            if distance <= 2:
+                result.site_type = 'acceptor'
+                result.is_canonical_region = True
+                result.is_extended_region = True
+                result.confidence = 'high'
+            elif distance <= 25:
+                # Branch point region is typically -18 to -40
+                result.site_type = 'acceptor'
+                result.is_canonical_region = False
+                result.is_extended_region = True
+                result.confidence = 'medium'
+            else:
+                result.site_type = 'deep_intronic'
+                result.confidence = 'low'
+        
+        return result
+    
+    # Pattern for exonic variants: c.XXX (just a number, no +/-)
+    # Examples: c.1234A>G, c.456del
+    exonic_pattern = r'c\.(\d+)[A-Z>]'
+    exonic_match = re.search(exonic_pattern, hgvs)
+    
+    if exonic_match:
+        result.site_type = 'exonic'
+        result.cds_position = int(exonic_match.group(1))
+        result.confidence = 'medium'
+        result.raw_match = exonic_match.group(0)
+        return result
+    
+    # Pattern for exon boundary variants: c.XXX_XXX (deletions spanning boundaries)
+    # Or complex variants - mark as unknown
+    
+    return result
+
+
+@dataclass
 class VariantRecord:
     """
     Single variant record from SpliceVarDB.
@@ -89,6 +238,18 @@ class VariantRecord:
     They describe the VARIANT'S EFFECT on splicing, not what type of
     splice site the position is.
     
+    HGVS POSITION HINTS:
+    ====================
+    
+    The `hgvs` field contains HGVS notation which can be parsed to infer
+    which splice site is likely affected:
+    
+    - c.670-1G>T   → Near acceptor site (1bp before exon)
+    - c.1092+2T>A  → Near donor site (2bp after exon)
+    - c.1018-550A>G → Deep intronic (potential cryptic site)
+    
+    Use `get_position_hint()` to extract this information.
+    
     See docs/data/SPLICEVARDB.md for full documentation.
     """
     
@@ -102,6 +263,9 @@ class VariantRecord:
     method: str
     classification: str  # "Splice-altering", "Non-splice-altering", "Low-frequency", "Conflicting"
     location: str  # "Exonic", "Intronic"
+    
+    # Cached HGVS parsing result
+    _position_hint: Optional[HGVSPositionHint] = field(default=None, repr=False)
     
     @property
     def is_splice_altering(self) -> bool:
@@ -121,6 +285,68 @@ class VariantRecord:
     def get_coordinate_key(self) -> str:
         """Get a unique coordinate key for matching."""
         return f"{self.chrom}:{self.position}"
+    
+    def get_position_hint(self) -> HGVSPositionHint:
+        """
+        Get position hint from HGVS notation.
+        
+        This parses the HGVS notation to infer which splice site is likely
+        affected by this variant (donor, acceptor, deep intronic, or exonic).
+        
+        Returns
+        -------
+        HGVSPositionHint
+            Parsed position information including:
+            - site_type: 'donor', 'acceptor', 'deep_intronic', 'exonic', 'unknown'
+            - distance_from_boundary: Distance in bp from exon boundary
+            - is_canonical_region: True if within ±2bp of splice site
+            - is_extended_region: True if within ±10bp (donor) or ±25bp (acceptor)
+            - confidence: 'high', 'medium', or 'low'
+        
+        Examples
+        --------
+        >>> variant = VariantRecord(..., hgvs="NM_194292.3:c.670-1G>T")
+        >>> hint = variant.get_position_hint()
+        >>> print(hint.site_type)  # 'acceptor'
+        >>> print(hint.is_canonical_region)  # True
+        """
+        if self._position_hint is None:
+            self._position_hint = parse_hgvs_position_hint(self.hgvs)
+        return self._position_hint
+    
+    @property
+    def inferred_site_type(self) -> str:
+        """
+        Shortcut to get the inferred splice site type.
+        
+        Returns
+        -------
+        str
+            'donor', 'acceptor', 'deep_intronic', 'exonic', or 'unknown'
+        """
+        return self.get_position_hint().site_type
+    
+    @property
+    def is_canonical_splice_site(self) -> bool:
+        """
+        Whether this variant is in a canonical splice region (±2bp).
+        
+        Canonical splice sites are:
+        - Donor: GT at positions +1, +2
+        - Acceptor: AG at positions -1, -2
+        """
+        return self.get_position_hint().is_canonical_region
+    
+    @property
+    def is_extended_splice_region(self) -> bool:
+        """
+        Whether this variant is in an extended splice region.
+        
+        Extended regions include:
+        - Donor: +1 to +10
+        - Acceptor: -1 to -25 (includes branch point region)
+        """
+        return self.get_position_hint().is_extended_region
 
 
 class SpliceVarDBLoader:

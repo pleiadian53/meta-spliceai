@@ -201,14 +201,107 @@ class EffectTypeClassifier(nn.Module):
 
 ### Step 3: Position Localization
 
-**Task**: Identify which positions are affected
+**Task**: Identify which positions are affected by the variant
 
-**Option A: Attention-based**
+**The Key Challenge**: SpliceVarDB tells us WHERE the mutation is, but NOT where the affected splice site is.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                   VARIANT vs AFFECTED SPLICE SITE                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Example: Variant at position 1000 might:                               │
+│    - Destroy existing donor at position 1000 (variant position)         │
+│    - Create new cryptic donor at position 1005                          │
+│    - Disrupt existing acceptor at position 990                          │
+│                                                                         │
+│  SpliceVarDB provides:                                                  │
+│    ✅ Variant position (1000)                                           │
+│    ✅ Classification (Splice-altering)                                  │
+│    ⚠️ HGVS hints (c.670-1G>T → near acceptor)                          │
+│    ❌ Exact affected splice site position                               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Deriving Position Labels
+
+We have TWO approaches for creating training labels:
+
+**Approach 1: HGVS Parsing (Weak Labels)**
+
+HGVS notation contains position hints relative to exon boundaries:
+
+```python
+from meta_spliceai.splice_engine.meta_layer.data.position_labels import (
+    derive_position_labels_from_hgvs
+)
+
+# HGVS notation patterns:
+# c.670-1G>T   → 1bp before exon = ACCEPTOR site (canonical)
+# c.1092+2T>A  → 2bp after exon  = DONOR site (canonical)
+# c.1018-550A>G → 550bp in intron = deep intronic (cryptic?)
+
+hint = variant.get_position_hint()
+print(f"Site type: {hint.site_type}")           # 'acceptor'
+print(f"Distance: {hint.distance_from_boundary}")  # 1
+print(f"Canonical: {hint.is_canonical_region}")    # True
+print(f"Confidence: {hint.confidence}")            # 'high'
+```
+
+| HGVS Pattern | Interpretation | Likely Effect |
+|--------------|----------------|---------------|
+| `c.XXX-1` or `c.XXX-2` | Canonical acceptor (AG) | Acceptor loss |
+| `c.XXX+1` or `c.XXX+2` | Canonical donor (GT) | Donor loss |
+| `c.XXX-N` (N > 25) | Deep intronic | Cryptic site? |
+| `c.XXX+N` (N > 10) | Deep intronic | Cryptic site? |
+| `c.XXX` (no +/-) | Exonic | ESE/ESS disruption |
+
+**Approach 2: Base Model Delta Analysis (Recommended)**
+
+Use the base model to find where delta peaks occur:
+
+```python
+from meta_spliceai.splice_engine.meta_layer.data.position_labels import (
+    derive_position_labels_from_delta,
+    create_position_attention_target
+)
+
+# Find positions with significant delta
+affected_positions = derive_position_labels_from_delta(
+    ref_seq, alt_seq, base_model, 
+    threshold=0.1  # Minimum delta to consider
+)
+
+# Each position has:
+# - position: int (0-indexed in sequence)
+# - effect_type: 'donor_gain', 'donor_loss', 'acceptor_gain', 'acceptor_loss'
+# - delta_value: float (signed, positive=gain, negative=loss)
+# - confidence: 'high', 'medium', 'low'
+
+for pos in affected_positions:
+    print(f"Position {pos.position}: {pos.effect_type} (Δ={pos.delta_value:.3f})")
+
+# Create attention target for training
+attention_target = create_position_attention_target(
+    affected_positions, 
+    sequence_length=501,
+    sigma=3.0  # Gaussian spread around peak
+)
+# attention_target is [501] with soft peaks at affected positions
+```
+
+#### Architecture Options
+
+**Option A: Attention-based (Recommended)**
 ```python
 class PositionLocalizer(nn.Module):
     """
     Output attention weights over positions.
     High attention = likely affected position.
+    
+    Training target: Soft attention distribution from base model delta peaks
+    Loss: KL divergence or cross-entropy with soft targets
     """
     def __init__(self, hidden_dim=128):
         super().__init__()
@@ -219,8 +312,13 @@ class PositionLocalizer(nn.Module):
             nn.Linear(hidden_dim // 2, 1)
         )
     
-    def forward(self, alt_seq):
+    def forward(self, alt_seq, effect_type_embedding=None):
         features = self.encoder.encode_per_position(alt_seq)  # [B, L, H]
+        
+        # Optionally condition on effect type from Step 2
+        if effect_type_embedding is not None:
+            features = features + effect_type_embedding.unsqueeze(1)
+        
         attention = F.softmax(self.attention(features).squeeze(-1), dim=-1)  # [B, L]
         return attention
 ```
@@ -230,12 +328,38 @@ class PositionLocalizer(nn.Module):
 class PositionSegmenter(nn.Module):
     """
     Binary mask: Which positions are affected?
+    
+    Training target: Binary mask from base model delta peaks (expanded ±2bp)
+    Loss: Binary cross-entropy
     """
     def forward(self, alt_seq):
         features = self.encoder(alt_seq)  # [B, L, H]
         mask_logits = self.head(features)  # [B, L, 1]
         return torch.sigmoid(mask_logits)
 ```
+
+**Option C: Regression (point prediction)**
+```python
+class PositionRegressor(nn.Module):
+    """
+    Directly predict the position offset from variant.
+    
+    Output: Single integer offset (e.g., -5 means 5bp before variant)
+    """
+    def forward(self, alt_seq):
+        features = self.encoder(alt_seq)  # [B, H]
+        offset = self.head(features)  # [B, 1] - continuous offset
+        return offset
+```
+
+#### Implementation Status
+
+| Component | File | Status |
+|-----------|------|--------|
+| HGVS Parsing | `data/splicevardb_loader.py` | ✅ Implemented |
+| Position Label Derivation | `data/position_labels.py` | ✅ Implemented |
+| PositionLocalizer Model | `models/position_localizer.py` | ⏳ TODO |
+| Training Script | `tests/test_position_localization.py` | ⏳ TODO |
 
 ---
 
