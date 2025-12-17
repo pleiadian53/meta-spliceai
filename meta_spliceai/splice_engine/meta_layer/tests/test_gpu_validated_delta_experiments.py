@@ -878,7 +878,7 @@ def main():
             name="HyenaDNA-small ValidatedDelta",
             max_train=25000,
             max_test=1000,
-            epochs=30,
+            epochs=50,  # Will stop early
             batch_size=32,
             hidden_dim=256,
             use_hyenadna=True,
@@ -886,6 +886,8 @@ def main():
             freeze_encoder=True,
             gradient_accumulation=2,
             device=args.device,
+            val_split=0.15,  # Early stopping
+            patience=7,
             description="HyenaDNA-small encoder with validated delta targets"
         ),
         'hyenadna_medium': GPUExperimentConfig(
