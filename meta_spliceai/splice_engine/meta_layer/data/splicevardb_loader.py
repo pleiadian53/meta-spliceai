@@ -15,10 +15,47 @@ import polars as pl
 
 logger = logging.getLogger(__name__)
 
-# Default path to SpliceVarDB data
-# Path relative to meta_spliceai package root
-DEFAULT_SPLICEVARDB_PATH = Path(__file__).parent.parent.parent / \
-    "case_studies/workflows/splicevardb/splicevardb.download.tsv"
+# SpliceVarDB data file search paths (in priority order)
+# 1. Standard data directory (recommended for both local and remote)
+# 2. Legacy package path (backwards compatibility)
+
+def _find_splicevardb_path() -> Path:
+    """
+    Find SpliceVarDB data file by searching multiple locations.
+    
+    Search order:
+    1. data/splicevardb/ (standard data directory, works on local and remote)
+    2. case_studies/workflows/splicevardb/ (legacy package location)
+    
+    Returns
+    -------
+    Path
+        Path to the SpliceVarDB TSV file
+    """
+    # Get project root (parent of meta_spliceai package)
+    package_root = Path(__file__).parent.parent.parent  # meta_spliceai/splice_engine
+    project_root = package_root.parent.parent  # meta-spliceai/
+    
+    # Search locations in priority order
+    search_paths = [
+        # Standard data directory (recommended)
+        project_root / "data" / "splicevardb" / "splicevardb.download.tsv",
+        # Legacy package location (backwards compatibility)
+        package_root / "case_studies" / "workflows" / "splicevardb" / "splicevardb.download.tsv",
+        # RunPods workspace location
+        Path("/workspace/meta-spliceai/data/splicevardb/splicevardb.download.tsv"),
+    ]
+    
+    for path in search_paths:
+        if path.exists():
+            logger.debug(f"Found SpliceVarDB at: {path}")
+            return path
+    
+    # Return first path (for error message purposes)
+    return search_paths[0]
+
+
+DEFAULT_SPLICEVARDB_PATH = _find_splicevardb_path()
 
 
 @dataclass
