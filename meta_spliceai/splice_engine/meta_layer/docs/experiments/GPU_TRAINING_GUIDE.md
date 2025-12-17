@@ -430,8 +430,8 @@ if epoch % 5 == 0:
 
 - **ROADMAP.md**: Overall methodology roadmap
 - **GPU_REQUIREMENTS.md**: Detailed compute requirements
-- **APPROACH_A_PAIRED.md**: Siamese architecture details
-- **APPROACH_B_SINGLE_PASS.md**: Validated delta approach
+- **PAIRED_DELTA_PREDICTION.md**: Siamese architecture details (deprecated)
+- **VALIDATED_DELTA_PREDICTION.md**: Validated delta approach (recommended)
 - **MULTI_STEP_FRAMEWORK.md**: Decomposed problem formulation
 
 ---

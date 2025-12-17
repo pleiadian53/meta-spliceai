@@ -1515,9 +1515,9 @@ output = {
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Overall system architecture
 - [ALTERNATIVE_SPLICING_PIPELINE.md](ALTERNATIVE_SPLICING_PIPELINE.md) - From scores to exon predictions
 - [TRAINING_GUIDE.md](TRAINING_GUIDE.md) - Step-by-step training instructions
-- [methods/ROADMAP.md](methods/ROADMAP.md) - **Methodology development roadmap** (NEW)
-- [methods/APPROACH_A_PAIRED.md](methods/APPROACH_A_PAIRED.md) - Paired delta prediction
-- [methods/APPROACH_B_SINGLE_PASS.md](methods/APPROACH_B_SINGLE_PASS.md) - **Single-pass delta prediction** (NEW)
+- [methods/ROADMAP.md](methods/ROADMAP.md) - **Methodology development roadmap**
+- [methods/PAIRED_DELTA_PREDICTION.md](methods/PAIRED_DELTA_PREDICTION.md) - Paired delta prediction (deprecated)
+- [methods/VALIDATED_DELTA_PREDICTION.md](methods/VALIDATED_DELTA_PREDICTION.md) - **Validated delta prediction** (recommended)
 - [MULTI_STEP_FRAMEWORK.md](MULTI_STEP_FRAMEWORK.md) - Decomposed problem approach
 
 ---

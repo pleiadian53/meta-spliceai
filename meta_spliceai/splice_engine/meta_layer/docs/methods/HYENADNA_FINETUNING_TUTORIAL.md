@@ -548,20 +548,37 @@ tail -f logs/hyenadna_finetune.log
 
 ## Experiments and Results
 
-### Experiment Matrix
+### Experiment Matrix (December 2025)
 
-| Experiment | Model | Freeze | Unfreeze | Correlation | ROC-AUC | Status |
-|------------|-------|--------|----------|-------------|---------|--------|
-| Baseline CNN | - | - | - | **0.609** | **0.585** | ✅ Done |
-| HyenaDNA Frozen | small | Yes | 0 | 0.484 | 0.562 | ✅ Done |
-| HyenaDNA FT-2 | medium | No | 2 | TBD | TBD | 🔄 Running |
-| HyenaDNA FT-4 | medium | No | 4 | TBD | TBD | ⏳ Pending |
+| Experiment | Model | Freeze | Unfreeze | Correlation | ROC-AUC | PR-AUC | Status |
+|------------|-------|--------|----------|-------------|---------|--------|--------|
+| **Baseline CNN** | Gated CNN | - | - | **0.609** | 0.585 | **0.702** | ✅ **BEST** |
+| HyenaDNA Frozen | small-32k | Yes | 0 | 0.484 | 0.562 | 0.692 | ✅ Done |
+| HyenaDNA FT-2 | medium-160k | No | 2 | 0.490 | 0.600 | 0.692 | ✅ Done |
+| HyenaDNA FT-4 | medium-160k | No | 4 | - | - | - | ❌ Not tested |
 
-### Key Findings
+### Key Findings (Updated with Actual Results)
 
-1. **Frozen HyenaDNA underperformed CNN** - Pre-training alone isn't enough
-2. **Fine-tuning allows adaptation** - Last layers learn task-specific patterns
-3. **Discriminative LR is crucial** - Prevents catastrophic forgetting
+1. **Frozen HyenaDNA underperformed CNN** - Pre-training alone isn't enough (r=0.484 vs r=0.609)
+2. **Fine-tuning provided minimal improvement** - Only +1.2% correlation, +6.8% ROC-AUC
+3. **Task-specific CNN wins** - Simple gated CNN outperforms 25M parameter pre-trained model
+4. **Hypothesis validated**: For delta prediction, task-specific architectures beat foundation models
+
+### Why Fine-tuning Didn't Help More
+
+| Factor | Impact |
+|--------|--------|
+| **Task specificity** | Delta prediction requires learning what SpliceAI cares about, not general DNA patterns |
+| **Insufficient adaptation** | 2 layers may not be enough for such a different task |
+| **Data size** | 22K samples may be too small to effectively fine-tune a 25M parameter model |
+| **Architecture mismatch** | Single-pass from pooled embeddings loses position information |
+
+### Recommendations Based on Results
+
+1. ✅ **Use task-specific CNN** for validated delta prediction (r=0.609)
+2. ❌ **Don't use HyenaDNA** for this task without significant modifications
+3. 🔄 Consider **multi-task pre-training** on splice prediction specifically
+4. 🔄 Consider **meta-recalibration** approach to improve base model upstream
 
 ---
 

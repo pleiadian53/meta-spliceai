@@ -7,10 +7,12 @@ This directory contains documentation for the various methodological approaches 
 | Document | Description | Status |
 |----------|-------------|--------|
 | [ROADMAP.md](ROADMAP.md) | High-level methodology development roadmap | Active |
-| [APPROACH_A_PAIRED.md](APPROACH_A_PAIRED.md) | Siamese/paired delta prediction | Tested (r=0.38) |
-| [APPROACH_B_SINGLE_PASS.md](APPROACH_B_SINGLE_PASS.md) | Single-pass validated delta prediction | **BEST (r=0.507)** ⭐ |
+| [VALIDATED_DELTA_PREDICTION.md](VALIDATED_DELTA_PREDICTION.md) | Single-pass validated delta prediction | ✅ **Recommended (r=0.609)** |
+| [META_RECALIBRATION.md](META_RECALIBRATION.md) | Per-position splice score refinement | 🔬 Proposed |
 | [MULTI_STEP_FRAMEWORK.md](MULTI_STEP_FRAMEWORK.md) | Decomposed classification approach | ⭐ **Best for Interpretability** |
+| [PAIRED_DELTA_PREDICTION.md](PAIRED_DELTA_PREDICTION.md) | Siamese/paired delta prediction | ⚠️ Deprecated for variant detection |
 | [GPU_REQUIREMENTS.md](GPU_REQUIREMENTS.md) | Compute resource guide | Active |
+| [HYENADNA_FINETUNING_TUTORIAL.md](HYENADNA_FINETUNING_TUTORIAL.md) | HyenaDNA fine-tuning guide | Tutorial |
 
 ---
 
@@ -69,25 +71,54 @@ The key insight of Multi-Step is **using previous answers to simplify subsequent
 
 ## Quick Reference
 
-### Approach Summary
+### Method Summary
 
 ```
-APPROACH A (Paired)               APPROACH B (Single-Pass) ⭐ BEST
-─────────────────────────         ─────────────────────────────────
-ref_seq ──→ encoder ──┐           alt_seq ──→ encoder ──┐
-                      ├─→ diff    ref_base ──→ embed ──┼─→ delta
-alt_seq ──→ encoder ──┘           alt_base ──→ embed ──┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    META-LAYER METHODS OVERVIEW                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. META-RECALIBRATION 🔬 (per-position refinement)                    │
+│  ──────────────────────────────────────────────────                     │
+│     Input:  sequence + base_scores [L, 3]                              │
+│     Output: recalibrated_scores [L, 3]                                 │
+│     Task:   Improve splice site predictions                            │
+│     Status: Proposed                                                    │
+│                                                                         │
+│  2. VALIDATED DELTA ✅ (variant effect magnitude)                      │
+│  ────────────────────────────────────────────────                       │
+│     Input:  alt_seq + ref_base + alt_base                              │
+│     Output: delta [3] = [Δ_donor, Δ_acceptor, Δ_neither]               │
+│     Task:   Predict variant-induced splice changes                     │
+│     Status: Recommended (r=0.609)                                      │
+│                                                                         │
+│  3. MULTI-STEP ⭐ (interpretable decisions)                            │
+│  ──────────────────────────────────────────                             │
+│     Step 1: Is it splice-altering? → Yes/No                            │
+│     Step 2: What type?             → Donor/Acceptor gain/loss          │
+│     Step 3: Where exactly?         → Position                          │
+│     Status: Step 1 tested (AUC=0.61), Steps 2-3 pending                │
+│                                                                         │
+│  HOW THEY FIT TOGETHER:                                                 │
+│  ──────────────────────                                                 │
+│                                                                         │
+│     base_model ──→ META-RECALIBRATION ──→ better scores [L,3]          │
+│                            │                                            │
+│                            ↓                                            │
+│     better scores ──→ VALIDATED DELTA ──→ delta targets [3]            │
+│                            │                                            │
+│                            ↓                                            │
+│     delta + context ──→ MULTI-STEP ──→ decisions + positions           │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 
-Target: base_delta                Target: validated_delta
-Status: r=0.38                    Status: r=0.507 (8K samples) ⭐
 
-
-TARGET FORMAT (Both Approaches):
-─────────────────────────────────
+VALIDATED DELTA TARGET FORMAT:
+──────────────────────────────
 target = [Δ_donor, Δ_acceptor, Δ_neither]  # continuous floats in [-1, 1]
 Example: [+0.35, -0.02, -0.33] = donor gain (+0.35)
 
-Validated targets (Approach B):
+Validated target computation:
   Splice-altering: target = base_model(alt) - base_model(ref)  # Trust base model
   Normal:          target = [0.0, 0.0, 0.0]                    # Override!
 
@@ -97,7 +128,7 @@ MULTI-STEP FRAMEWORK
 Step 1: Is splice-altering? → Binary (AUC=0.61, needs >0.7)
 Step 2: What type?          → Multi-class (NOT IMPLEMENTED)
 Step 3: Where?              → Localization (NOT IMPLEMENTED)
-Step 4: How strong?         → Regression (NOT IMPLEMENTED)
+Step 4: How strong?         → Use ValidatedDelta
 ```
 
 ### Key Differences

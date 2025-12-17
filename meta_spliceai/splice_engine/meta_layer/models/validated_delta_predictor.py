@@ -28,7 +28,7 @@ Usage:
     delta = model(alt_seq, ref_base, alt_base)  # [B, 3]
 
 See Also:
-    - docs/methods/APPROACH_B_SINGLE_PASS.md for design rationale
+    - docs/methods/VALIDATED_DELTA_PREDICTION.md for design rationale
     - docs/experiments/004_validated_delta/ for experimental results
 """
 

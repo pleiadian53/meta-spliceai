@@ -159,7 +159,7 @@ Final score = base_scores + Δ
 
 **Documentation**: 
 - `docs/experiments/004_validated_delta/README.md`
-- `docs/methods/APPROACH_B_SINGLE_PASS.md`
+- `docs/methods/VALIDATED_DELTA_PREDICTION.md`
 
 ---
 
@@ -306,11 +306,12 @@ For clinical/regulatory approval, **you need to explain your predictions**.
 ```
 meta_layer/docs/
 ├── methods/                      # Methodology development
-│   ├── ROADMAP.md               # This file
-│   ├── APPROACH_A_PAIRED.md     # Siamese delta prediction
-│   ├── APPROACH_B_SINGLE_PASS.md # Single-pass delta prediction
-│   ├── MULTI_STEP_FRAMEWORK.md  # Decomposed approach
-│   └── GPU_REQUIREMENTS.md      # Compute requirements
+│   ├── ROADMAP.md                    # This file
+│   ├── VALIDATED_DELTA_PREDICTION.md # Single-pass validated delta (recommended)
+│   ├── META_RECALIBRATION.md         # Per-position splice score refinement (proposed)
+│   ├── MULTI_STEP_FRAMEWORK.md       # Decomposed approach
+│   ├── PAIRED_DELTA_PREDICTION.md    # Siamese delta prediction (deprecated)
+│   └── GPU_REQUIREMENTS.md           # Compute requirements
 │
 ├── experiments/                  # Detailed experiment logs
 │   ├── 001_canonical_classification/

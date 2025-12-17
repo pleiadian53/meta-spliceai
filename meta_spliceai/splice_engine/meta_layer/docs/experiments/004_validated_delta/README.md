@@ -258,7 +258,7 @@ Loss continues to decrease, suggesting more epochs or data could help.
 |------|-------------|
 | `models/validated_delta_predictor.py` | Model implementation |
 | `tests/test_validated_delta_experiments.py` | Experiment runner |
-| `docs/methods/APPROACH_B_SINGLE_PASS.md` | Design rationale |
+| `docs/methods/VALIDATED_DELTA_PREDICTION.md` | Design rationale |
 
 ### Saved Checkpoints
 
