@@ -154,6 +154,28 @@ class Registry:
         if is_primary_genomic:
             # GTF/FASTA can fall back to root directory for backwards compatibility
             search_order = [self.stash, self.top]
+            
+            # Add cross-platform fallback paths for FASTA/GTF
+            # This handles RunPods and other environments where files may be in
+            # different annotation source directories
+            build_dir = self.cfg.build.replace("_MANE", "").replace("_GENCODE", "")
+            
+            # Try alternative annotation sources (e.g., mane vs ensembl)
+            for source in ["mane", "ensembl", "gencode"]:
+                if source != self.annotation_source:
+                    alt_path = self.cfg.data_root / source / build_dir
+                    if alt_path not in search_order:
+                        search_order.append(alt_path)
+            
+            # RunPods-specific paths (absolute paths that work regardless of project root)
+            runpods_paths = [
+                Path(f"/workspace/meta-spliceai/data/mane/{build_dir}"),
+                Path(f"/workspace/meta-spliceai/data/ensembl/{build_dir}"),
+                Path(f"/workspace/meta-spliceai/data/{build_dir}"),
+            ]
+            for rp in runpods_paths:
+                if rp not in search_order:
+                    search_order.append(rp)
         else:
             # Derived datasets: STRICT build-specific search only
             # This prevents loading wrong build's gene_features.tsv, splice_sites.tsv, etc.
@@ -214,8 +236,27 @@ class Registry:
         fasta_path = self.resolve("fasta")
         if fasta_path is None:
             if validate:
+                # Build helpful error message with expected locations
+                expected_name = filename("fasta", self.cfg)
+                build_dir = self.cfg.build.replace("_MANE", "").replace("_GENCODE", "")
+                
                 raise FileNotFoundError(
-                    f"FASTA file not found for build {self.cfg.build}, release {self.cfg.release}"
+                    f"FASTA file not found for build {self.cfg.build}, release {self.cfg.release}\n"
+                    f"\n"
+                    f"Expected file: {expected_name}\n"
+                    f"\n"
+                    f"Searched in:\n"
+                    f"  1. {self.stash}/\n"
+                    f"  2. {self.top}/\n"
+                    f"  3. {self.cfg.data_root}/mane/{build_dir}/\n"
+                    f"  4. {self.cfg.data_root}/ensembl/{build_dir}/\n"
+                    f"  5. /workspace/meta-spliceai/data/mane/{build_dir}/ (RunPods)\n"
+                    f"  6. /workspace/meta-spliceai/data/ensembl/{build_dir}/ (RunPods)\n"
+                    f"\n"
+                    f"Solutions:\n"
+                    f"  - Download: wget https://ftp.ensembl.org/pub/release-112/fasta/homo_sapiens/dna/{expected_name}.gz\n"
+                    f"  - Set environment variable: export SS_FASTA_PATH=/path/to/{expected_name}\n"
+                    f"  - Place file in one of the searched directories above"
                 )
             return None
         return Path(fasta_path)
