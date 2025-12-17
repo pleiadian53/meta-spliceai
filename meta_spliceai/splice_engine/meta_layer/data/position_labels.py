@@ -1,48 +1,39 @@
 """
 Position Label Derivation for Multi-Step Framework Step 3.
 
-This module provides utilities for deriving position labels (where splice effects occur)
-from SpliceVarDB variants, using two complementary approaches:
+This module provides utilities for deriving position-level labels for
+position localization training. Labels can be derived from:
 
-1. **HGVS Parsing** (weak labels): Extract position hints from HGVS notation
-2. **Base Model Delta Analysis** (recommended): Derive positions from base model delta peaks
-
-These labels can be used to train the Position Localization model (Step 3) in the
-Multi-Step Framework.
+1. Base model delta analysis (RECOMMENDED)
+2. HGVS parsing (if available)
+3. Effect type annotation (for specific site types)
 
 Usage
 -----
 >>> from meta_spliceai.splice_engine.meta_layer.data.position_labels import (
 ...     derive_position_labels_from_delta,
-...     derive_position_labels_from_hgvs,
-...     create_position_attention_target
+...     create_position_attention_target,
+...     create_binary_position_mask
 ... )
->>>
->>> # From base model deltas (recommended)
->>> affected_positions = derive_position_labels_from_delta(
-...     ref_seq, alt_seq, base_model, threshold=0.1
-... )
->>>
->>> # From HGVS notation (weak labels)
->>> hint = derive_position_labels_from_hgvs(variant, variant_position_in_window=250)
+>>> 
+>>> # From base model delta
+>>> affected = derive_position_labels_from_delta(ref_seq, alt_seq, models, device)
+>>> 
+>>> # Create training target
+>>> attention_target = create_position_attention_target(affected, seq_length=501)
 
 See Also
 --------
-- docs/methods/MULTI_STEP_FRAMEWORK.md: Multi-Step Framework documentation
-- data/splicevardb_loader.py: SpliceVarDB loading and HGVS parsing
+- docs/methods/MULTI_STEP_FRAMEWORK.md
+- models/position_localizer.py
 """
 
-import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.nn.functional as F
-
-from .splicevardb_loader import HGVSPositionHint, VariantRecord, parse_hgvs_position_hint
-
-logger = logging.getLogger(__name__)
 
 
 # =============================================================================
@@ -52,574 +43,491 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AffectedPosition:
     """
-    A single position affected by a variant.
+    Represents a position affected by a splice-altering variant.
     
     Attributes
     ----------
     position : int
-        Position in the sequence (0-indexed)
-    effect_type : str
-        Type of effect: 'donor_gain', 'donor_loss', 'acceptor_gain', 'acceptor_loss'
+        Position in the sequence (relative to center)
     delta_value : float
-        Magnitude of the delta (signed: positive=gain, negative=loss)
-    channel : str
-        Which channel: 'donor' or 'acceptor'
-    confidence : str
-        Confidence level: 'high', 'medium', 'low'
-    source : str
-        Where this label came from: 'base_model_delta', 'hgvs_parsing'
+        Delta magnitude at this position
+    channel : int
+        Which channel (0=neither, 1=acceptor, 2=donor)
+    effect_type : str
+        'donor_gain', 'donor_loss', 'acceptor_gain', 'acceptor_loss', 'unknown'
     """
     position: int
-    effect_type: str
     delta_value: float
-    channel: str
-    confidence: str = 'medium'
-    source: str = 'base_model_delta'
-
-
-@dataclass
-class PositionLabelResult:
-    """
-    Result of position label derivation for a variant.
+    channel: int
+    effect_type: str
     
-    Attributes
-    ----------
-    variant_id : str
-        Identifier for the variant
-    affected_positions : List[AffectedPosition]
-        List of affected positions with their effects
-    attention_target : Optional[np.ndarray]
-        Normalized attention target [L] for training
-    peak_position : Optional[int]
-        Position of maximum effect
-    peak_effect_type : Optional[str]
-        Type of effect at peak position
-    sequence_length : int
-        Length of the analyzed sequence
-    """
-    variant_id: str
-    affected_positions: List[AffectedPosition]
-    attention_target: Optional[np.ndarray] = None
-    peak_position: Optional[int] = None
-    peak_effect_type: Optional[str] = None
-    sequence_length: int = 0
+    @property
+    def is_gain(self) -> bool:
+        return self.delta_value > 0
+    
+    @property
+    def is_loss(self) -> bool:
+        return self.delta_value < 0
+    
+    @property
+    def is_donor(self) -> bool:
+        return self.channel == 2
+    
+    @property
+    def is_acceptor(self) -> bool:
+        return self.channel == 1
 
 
 # =============================================================================
-# BASE MODEL DELTA ANALYSIS (RECOMMENDED)
+# DELTA-BASED DERIVATION (RECOMMENDED)
 # =============================================================================
 
 def derive_position_labels_from_delta(
-    ref_seq: Union[str, np.ndarray],
-    alt_seq: Union[str, np.ndarray],
-    base_model,
-    device: str = 'cpu',
+    ref_seq: str,
+    alt_seq: str,
+    models: List,
+    device: str,
     threshold: float = 0.1,
-    window_around_variant: Optional[Tuple[int, int]] = None,
-    variant_position: Optional[int] = None
+    window: int = 50,
+    max_positions: int = 5
 ) -> List[AffectedPosition]:
     """
     Derive affected positions from base model delta analysis.
     
-    This is the RECOMMENDED approach for deriving position labels. It uses the
-    base model (SpliceAI/OpenSpliceAI) to identify where splice probabilities
-    change significantly due to the variant.
+    This is the RECOMMENDED approach for position label derivation because
+    it directly identifies where the splice site probability changes most.
     
     Parameters
     ----------
-    ref_seq : str or np.ndarray
-        Reference sequence (string or one-hot encoded)
-    alt_seq : str or np.ndarray
-        Alternate sequence with variant
-    base_model : nn.Module or callable
-        Base splice prediction model (or list for ensemble)
+    ref_seq : str
+        Reference DNA sequence (should be 10K+ for base model)
+    alt_seq : str
+        Alternate DNA sequence with variant embedded
+    models : List
+        List of base models (OpenSpliceAI or similar)
     device : str
         Device for inference
     threshold : float
-        Minimum absolute delta to consider significant (default 0.1)
-    window_around_variant : tuple of (start, end), optional
-        Only consider positions within this window. If None, uses ±50bp from center.
-    variant_position : int, optional
-        Position of variant in sequence. If None, assumes center.
+        Minimum |delta| to consider significant
+    window : int
+        Window around center to search (±window bp)
+    max_positions : int
+        Maximum number of affected positions to return
     
     Returns
     -------
     List[AffectedPosition]
-        List of positions with significant delta effects
+        Affected positions sorted by delta magnitude (descending)
     
-    Examples
-    --------
-    >>> affected = derive_position_labels_from_delta(
-    ...     ref_seq, alt_seq, base_model, threshold=0.1
-    ... )
-    >>> for pos in affected:
-    ...     print(f"Position {pos.position}: {pos.effect_type} (Δ={pos.delta_value:.3f})")
+    Example
+    -------
+    >>> affected = derive_position_labels_from_delta(ref, alt, models, 'cuda')
+    >>> for ap in affected:
+    ...     print(f"Position {ap.position}: {ap.effect_type} (Δ={ap.delta_value:.3f})")
     """
-    # Convert to one-hot if needed
-    if isinstance(ref_seq, str):
-        ref_oh = _one_hot_encode(ref_seq)
-        alt_oh = _one_hot_encode(alt_seq)
-    else:
-        ref_oh = ref_seq
-        alt_oh = alt_seq
+    # One-hot encode
+    def one_hot(seq: str) -> np.ndarray:
+        mapping = {'A': 0, 'C': 1, 'G': 2, 'T': 3, 'N': 0}
+        indices = [mapping.get(b.upper(), 0) for b in seq]
+        oh = np.zeros((4, len(seq)), dtype=np.float32)
+        oh[indices, np.arange(len(seq))] = 1
+        return oh
     
-    # Get base model predictions
-    ref_scores = _get_base_model_scores(ref_oh, base_model, device)
-    alt_scores = _get_base_model_scores(alt_oh, base_model, device)
+    # Run base models
+    def predict(seq: str) -> np.ndarray:
+        x = torch.tensor(one_hot(seq), dtype=torch.float32).unsqueeze(0).to(device)
+        with torch.no_grad():
+            preds = [m(x).cpu() for m in models]
+            avg = torch.mean(torch.stack(preds), dim=0)
+            # OpenSpliceAI outputs [B, 3, L], softmax along channel
+            probs = F.softmax(avg, dim=1)
+        return probs[0].permute(1, 0).numpy()  # [L, 3]
     
-    # Compute delta
-    delta = alt_scores - ref_scores  # [L, 3] for [neither, acceptor, donor]
+    ref_probs = predict(ref_seq)
+    alt_probs = predict(alt_seq)
+    delta = alt_probs - ref_probs  # [L, 3]
     
-    # Determine search window
-    seq_len = len(delta)
-    if window_around_variant is not None:
-        start, end = window_around_variant
-    elif variant_position is not None:
-        start = max(0, variant_position - 50)
-        end = min(seq_len, variant_position + 51)
-    else:
-        # Assume variant is at center
-        center = seq_len // 2
-        start = max(0, center - 50)
-        end = min(seq_len, center + 51)
+    # Focus on center region
+    center = len(delta) // 2
+    start = max(0, center - window)
+    end = min(len(delta), center + window + 1)
     
-    # Find affected positions
+    # Channel names: [neither, acceptor, donor]
+    channel_names = ['neither', 'acceptor', 'donor']
+    
+    # Find positions with significant delta
     affected = []
     
     for pos in range(start, end):
-        # OpenSpliceAI output: [neither, acceptor, donor]
-        donor_delta = delta[pos, 2]
-        acceptor_delta = delta[pos, 1]
+        rel_pos = pos - center  # Position relative to center
         
-        # Check donor effect
-        if abs(donor_delta) >= threshold:
-            effect_type = 'donor_gain' if donor_delta > 0 else 'donor_loss'
-            confidence = 'high' if abs(donor_delta) >= 0.3 else 'medium'
+        for ch in [1, 2]:  # Only acceptor (1) and donor (2)
+            d = delta[pos, ch]
             
-            affected.append(AffectedPosition(
-                position=pos,
-                effect_type=effect_type,
-                delta_value=float(donor_delta),
-                channel='donor',
-                confidence=confidence,
-                source='base_model_delta'
-            ))
-        
-        # Check acceptor effect
-        if abs(acceptor_delta) >= threshold:
-            effect_type = 'acceptor_gain' if acceptor_delta > 0 else 'acceptor_loss'
-            confidence = 'high' if abs(acceptor_delta) >= 0.3 else 'medium'
-            
-            affected.append(AffectedPosition(
-                position=pos,
-                effect_type=effect_type,
-                delta_value=float(acceptor_delta),
-                channel='acceptor',
-                confidence=confidence,
-                source='base_model_delta'
-            ))
+            if abs(d) >= threshold:
+                # Determine effect type
+                if ch == 2:  # donor
+                    effect_type = 'donor_gain' if d > 0 else 'donor_loss'
+                else:  # acceptor
+                    effect_type = 'acceptor_gain' if d > 0 else 'acceptor_loss'
+                
+                affected.append(AffectedPosition(
+                    position=rel_pos,
+                    delta_value=d,
+                    channel=ch,
+                    effect_type=effect_type
+                ))
     
-    # Sort by absolute delta (strongest effects first)
+    # Sort by delta magnitude
     affected.sort(key=lambda x: abs(x.delta_value), reverse=True)
     
-    return affected
+    return affected[:max_positions]
 
+
+def derive_position_labels_per_channel(
+    ref_seq: str,
+    alt_seq: str,
+    models: List,
+    device: str,
+    window: int = 50
+) -> Dict[str, AffectedPosition]:
+    """
+    Derive the single most affected position PER CHANNEL.
+    
+    This is an alternative to derive_position_labels_from_delta that
+    separately finds the max delta for donor and acceptor channels.
+    
+    Returns
+    -------
+    Dict[str, AffectedPosition]
+        Keys: 'donor', 'acceptor'. May be empty if no significant delta.
+    """
+    # One-hot encode
+    def one_hot(seq: str) -> np.ndarray:
+        mapping = {'A': 0, 'C': 1, 'G': 2, 'T': 3, 'N': 0}
+        indices = [mapping.get(b.upper(), 0) for b in seq]
+        oh = np.zeros((4, len(seq)), dtype=np.float32)
+        oh[indices, np.arange(len(seq))] = 1
+        return oh
+    
+    def predict(seq: str) -> np.ndarray:
+        x = torch.tensor(one_hot(seq), dtype=torch.float32).unsqueeze(0).to(device)
+        with torch.no_grad():
+            preds = [m(x).cpu() for m in models]
+            avg = torch.mean(torch.stack(preds), dim=0)
+            probs = F.softmax(avg, dim=1)
+        return probs[0].permute(1, 0).numpy()
+    
+    ref_probs = predict(ref_seq)
+    alt_probs = predict(alt_seq)
+    delta = alt_probs - ref_probs
+    
+    center = len(delta) // 2
+    start = max(0, center - window)
+    end = min(len(delta), center + window + 1)
+    
+    results = {}
+    
+    # Donor channel (2)
+    donor_delta = delta[start:end, 2]
+    max_donor_idx = np.abs(donor_delta).argmax()
+    max_donor_val = donor_delta[max_donor_idx]
+    if abs(max_donor_val) > 0.01:  # Minimum threshold
+        results['donor'] = AffectedPosition(
+            position=max_donor_idx - window,  # Relative to center
+            delta_value=max_donor_val,
+            channel=2,
+            effect_type='donor_gain' if max_donor_val > 0 else 'donor_loss'
+        )
+    
+    # Acceptor channel (1)
+    acc_delta = delta[start:end, 1]
+    max_acc_idx = np.abs(acc_delta).argmax()
+    max_acc_val = acc_delta[max_acc_idx]
+    if abs(max_acc_val) > 0.01:
+        results['acceptor'] = AffectedPosition(
+            position=max_acc_idx - window,
+            delta_value=max_acc_val,
+            channel=1,
+            effect_type='acceptor_gain' if max_acc_val > 0 else 'acceptor_loss'
+        )
+    
+    return results
+
+
+# =============================================================================
+# TRAINING TARGET GENERATION
+# =============================================================================
 
 def create_position_attention_target(
     affected_positions: List[AffectedPosition],
-    sequence_length: int,
+    seq_length: int,
+    center: Optional[int] = None,
     sigma: float = 3.0,
-    normalize: bool = True
+    delta_weighted: bool = True
 ) -> np.ndarray:
     """
-    Create an attention-style target distribution from affected positions.
-    
-    This creates a soft target for training position localization models,
-    where each affected position contributes a Gaussian peak weighted by
-    its delta magnitude.
+    Create soft attention target distribution for position localization.
     
     Parameters
     ----------
     affected_positions : List[AffectedPosition]
-        List of affected positions from delta analysis
-    sequence_length : int
-        Length of the output sequence
+        List of affected positions (from derive_position_labels_from_delta)
+    seq_length : int
+        Length of the sequence context
+    center : int, optional
+        Center position in sequence. Defaults to seq_length // 2
     sigma : float
-        Standard deviation of Gaussian peaks (default 3.0 = ±3bp spread)
-    normalize : bool
-        Whether to normalize to sum to 1 (default True)
+        Standard deviation of Gaussian for each peak
+    delta_weighted : bool
+        If True, weight Gaussians by delta magnitude
     
     Returns
     -------
     np.ndarray
-        Attention target of shape [sequence_length]
+        Soft attention distribution [seq_length], sums to 1
     
-    Examples
-    --------
-    >>> attention_target = create_position_attention_target(
-    ...     affected_positions, sequence_length=501, sigma=3.0
-    ... )
-    >>> # Use as soft target for attention/localization training
-    >>> loss = kl_divergence(pred_attention, attention_target)
+    Example
+    -------
+    >>> target = create_position_attention_target(affected, seq_length=501)
+    >>> assert target.shape == (501,)
+    >>> assert np.isclose(target.sum(), 1.0)
     """
-    target = np.zeros(sequence_length, dtype=np.float32)
+    if center is None:
+        center = seq_length // 2
+    
+    x = np.arange(seq_length)
+    attention = np.zeros(seq_length, dtype=np.float32)
     
     if not affected_positions:
-        # No affected positions: uniform distribution
-        if normalize:
-            target[:] = 1.0 / sequence_length
-        return target
+        # Fallback: uniform Gaussian at center
+        attention = np.exp(-0.5 * ((x - center) / sigma) ** 2)
+    else:
+        for ap in affected_positions:
+            # Convert relative position to absolute
+            abs_pos = center + ap.position
+            
+            if 0 <= abs_pos < seq_length:
+                # Weight by delta magnitude if requested
+                weight = abs(ap.delta_value) if delta_weighted else 1.0
+                
+                # Add Gaussian centered at this position
+                gaussian = np.exp(-0.5 * ((x - abs_pos) / sigma) ** 2)
+                attention += weight * gaussian
     
-    # Create Gaussian peaks at each affected position
-    x = np.arange(sequence_length)
+    # Normalize to sum to 1
+    if attention.sum() > 0:
+        attention = attention / attention.sum()
+    else:
+        # Fallback: uniform
+        attention = np.ones(seq_length) / seq_length
     
-    for pos_info in affected_positions:
-        pos = pos_info.position
-        weight = abs(pos_info.delta_value)
-        
-        if 0 <= pos < sequence_length:
-            # Add Gaussian peak
-            gaussian = np.exp(-0.5 * ((x - pos) / sigma) ** 2)
-            target += weight * gaussian
-    
-    # Normalize
-    if normalize and target.sum() > 0:
-        target = target / target.sum()
-    
-    return target
+    return attention
 
 
 def create_binary_position_mask(
     affected_positions: List[AffectedPosition],
-    sequence_length: int,
-    expand_by: int = 2
+    seq_length: int,
+    center: Optional[int] = None,
+    radius: int = 2
 ) -> np.ndarray:
     """
-    Create a binary mask of affected positions.
+    Create binary mask target for position segmentation.
     
     Parameters
     ----------
     affected_positions : List[AffectedPosition]
         List of affected positions
-    sequence_length : int
-        Length of the output sequence
-    expand_by : int
-        Expand each affected position by this many bp on each side (default 2)
+    seq_length : int
+        Length of the sequence context
+    center : int, optional
+        Center position in sequence
+    radius : int
+        Radius around each affected position to mark as 1
     
     Returns
     -------
     np.ndarray
-        Binary mask of shape [sequence_length] with 1s at affected positions
-    """
-    mask = np.zeros(sequence_length, dtype=np.float32)
+        Binary mask [seq_length]
     
-    for pos_info in affected_positions:
-        pos = pos_info.position
-        start = max(0, pos - expand_by)
-        end = min(sequence_length, pos + expand_by + 1)
-        mask[start:end] = 1.0
+    Example
+    -------
+    >>> mask = create_binary_position_mask(affected, seq_length=501, radius=2)
+    >>> assert mask.shape == (501,)
+    >>> assert set(np.unique(mask)) <= {0, 1}
+    """
+    if center is None:
+        center = seq_length // 2
+    
+    mask = np.zeros(seq_length, dtype=np.float32)
+    
+    for ap in affected_positions:
+        abs_pos = center + ap.position
+        
+        # Mark positions within radius
+        for i in range(max(0, abs_pos - radius), min(seq_length, abs_pos + radius + 1)):
+            mask[i] = 1.0
     
     return mask
 
 
-# =============================================================================
-# HGVS PARSING APPROACH (WEAK LABELS)
-# =============================================================================
-
-def derive_position_labels_from_hgvs(
-    variant: VariantRecord,
-    variant_position_in_window: int = 250,
-    window_size: int = 501
-) -> Optional[AffectedPosition]:
+def create_offset_target(
+    affected_positions: List[AffectedPosition],
+    seq_length: int = 1
+) -> np.ndarray:
     """
-    Derive position label from HGVS notation.
+    Create offset regression target (distance from variant to effect).
     
-    This is a WEAK labeling approach - it provides approximate position information
-    based on HGVS notation parsing. Use `derive_position_labels_from_delta` for
-    more accurate labels.
+    For simple offset prediction (Step 3 alternative), returns the
+    offset in bp from the variant position to the most significant
+    affected position.
     
     Parameters
     ----------
-    variant : VariantRecord
-        Variant record with HGVS notation
-    variant_position_in_window : int
-        Where the variant is located in the context window (default 250 = center)
-    window_size : int
-        Size of the context window (default 501)
+    affected_positions : List[AffectedPosition]
+        List of affected positions (sorted by delta magnitude)
+    seq_length : int
+        Not used, for API consistency
     
     Returns
     -------
-    AffectedPosition or None
-        Inferred affected position, or None if cannot be determined
-    
-    Notes
-    -----
-    HGVS notation like "c.670-1G>T" tells us:
-    - The variant is 1bp before an exon boundary
-    - This is likely affecting an acceptor site
-    - The affected splice site is at variant_position + 1
-    
-    However, this is approximate because:
-    - We don't know the exact exon coordinates
-    - The variant might create a cryptic site elsewhere
-    - Complex effects are not captured
+    np.ndarray
+        [offset_donor, offset_acceptor] or [offset] if single prediction
     """
-    hint = variant.get_position_hint()
+    offset_donor = 0
+    offset_acceptor = 0
     
-    if hint.site_type == 'unknown':
-        return None
+    for ap in affected_positions:
+        if ap.channel == 2 and offset_donor == 0:  # Donor
+            offset_donor = ap.position
+        elif ap.channel == 1 and offset_acceptor == 0:  # Acceptor
+            offset_acceptor = ap.position
     
-    if hint.site_type == 'deep_intronic':
-        # Deep intronic variants might create cryptic sites
-        # Position is uncertain - return variant position itself
-        return AffectedPosition(
-            position=variant_position_in_window,
-            effect_type='cryptic_unknown',
-            delta_value=0.0,  # Unknown magnitude
-            channel='unknown',
-            confidence='low',
-            source='hgvs_parsing'
-        )
+    return np.array([offset_donor, offset_acceptor], dtype=np.float32)
+
+
+# =============================================================================
+# HGVS-BASED DERIVATION (ALTERNATIVE)
+# =============================================================================
+
+def derive_position_from_hgvs(
+    hgvs: str,
+    effect_type: Optional[str] = None
+) -> Optional[AffectedPosition]:
+    """
+    Derive affected position from HGVS notation (when available).
     
-    if hint.site_type == 'exonic':
-        # Exonic variants may affect ESE/ESS
-        # Effect location is less certain
-        return AffectedPosition(
-            position=variant_position_in_window,
-            effect_type='exonic_unknown',
-            delta_value=0.0,
-            channel='unknown',
-            confidence='low',
-            source='hgvs_parsing'
-        )
+    HGVS can encode exact splice site positions (e.g., c.123+1G>A).
+    This is useful when HGVS annotations are available in SpliceVarDB.
     
-    # For donor/acceptor sites, we can estimate the affected position
-    if hint.site_type == 'donor':
-        # Variant is after exon (intron side)
-        # The donor splice site is at the exon boundary
-        # If variant is at +1, the donor site is at variant_position - 1
-        affected_pos = variant_position_in_window - hint.distance_from_boundary
+    Parameters
+    ----------
+    hgvs : str
+        HGVS notation (e.g., 'c.123+1G>A', 'c.456-2A>G')
+    effect_type : str, optional
+        Known effect type from annotation
+    
+    Returns
+    -------
+    Optional[AffectedPosition]
+        Affected position if parseable, None otherwise
+    """
+    import re
+    
+    # Pattern for intronic positions: c.X+Y or c.X-Y
+    intronic_pattern = r'c\.(\d+)([+-])(\d+)([ACGT])>([ACGT])'
+    match = re.search(intronic_pattern, hgvs)
+    
+    if match:
+        exon_pos = int(match.group(1))
+        direction = match.group(2)
+        offset = int(match.group(3))
+        ref_base = match.group(4)
+        alt_base = match.group(5)
         
-        # Determine if this is gain or loss
-        # Canonical mutations (+1, +2) usually cause loss
-        # Other mutations might create cryptic donors
-        if hint.is_canonical_region:
-            effect_type = 'donor_loss'  # Disrupting existing donor
-        else:
-            effect_type = 'donor_gain'  # Possibly creating new donor
+        # Determine if this is donor (+) or acceptor (-) region
+        if direction == '+':
+            # Donor site region (5' end of intron)
+            if offset <= 8:  # Close to splice site
+                channel = 2  # donor
+                inferred_type = 'donor_loss'  # Mutation in canonical site
+            else:
+                channel = 0  # neither
+                inferred_type = 'unknown'
+        else:  # direction == '-'
+            # Acceptor site region (3' end of intron)
+            if offset <= 8:
+                channel = 1  # acceptor
+                inferred_type = 'acceptor_loss'
+            else:
+                channel = 0
+                inferred_type = 'unknown'
+        
+        # Use provided effect type if available
+        final_type = effect_type if effect_type else inferred_type
         
         return AffectedPosition(
-            position=affected_pos,
-            effect_type=effect_type,
-            delta_value=0.0,
-            channel='donor',
-            confidence=hint.confidence,
-            source='hgvs_parsing'
-        )
-    
-    if hint.site_type == 'acceptor':
-        # Variant is before exon (intron side)
-        # The acceptor splice site is at the exon boundary
-        # If variant is at -1, the acceptor site is at variant_position + 1
-        affected_pos = variant_position_in_window + hint.distance_from_boundary
-        
-        # Canonical mutations (-1, -2) usually cause loss
-        if hint.is_canonical_region:
-            effect_type = 'acceptor_loss'
-        else:
-            effect_type = 'acceptor_gain'
-        
-        return AffectedPosition(
-            position=affected_pos,
-            effect_type=effect_type,
-            delta_value=0.0,
-            channel='acceptor',
-            confidence=hint.confidence,
-            source='hgvs_parsing'
+            position=0,  # HGVS doesn't give absolute position easily
+            delta_value=-0.5,  # Placeholder - we don't know actual delta
+            channel=channel,
+            effect_type=final_type
         )
     
     return None
 
 
 # =============================================================================
-# COMBINED APPROACH
+# UTILITIES
 # =============================================================================
 
-def derive_position_labels(
-    variant: VariantRecord,
-    ref_seq: Optional[str] = None,
-    alt_seq: Optional[str] = None,
-    base_model=None,
-    device: str = 'cpu',
-    threshold: float = 0.1,
-    use_hgvs_fallback: bool = True
-) -> PositionLabelResult:
-    """
-    Derive position labels using the best available method.
-    
-    This combines both approaches:
-    1. If base model and sequences are provided: use delta analysis (recommended)
-    2. Otherwise, fall back to HGVS parsing (weak labels)
-    
-    Parameters
-    ----------
-    variant : VariantRecord
-        The variant to analyze
-    ref_seq : str, optional
-        Reference sequence
-    alt_seq : str, optional
-        Alternate sequence
-    base_model : nn.Module, optional
-        Base model for delta analysis
-    device : str
-        Device for inference
-    threshold : float
-        Delta threshold for significance
-    use_hgvs_fallback : bool
-        Whether to use HGVS parsing if delta analysis is not available
-    
-    Returns
-    -------
-    PositionLabelResult
-        Complete position label information
-    """
-    affected_positions = []
-    
-    # Try delta analysis first (recommended)
-    if ref_seq is not None and alt_seq is not None and base_model is not None:
-        affected_positions = derive_position_labels_from_delta(
-            ref_seq, alt_seq, base_model, device, threshold
-        )
-    elif use_hgvs_fallback:
-        # Fall back to HGVS parsing
-        hgvs_result = derive_position_labels_from_hgvs(variant)
-        if hgvs_result is not None:
-            affected_positions = [hgvs_result]
-    
-    # Find peak position
-    peak_position = None
-    peak_effect_type = None
-    if affected_positions:
-        peak = max(affected_positions, key=lambda x: abs(x.delta_value))
-        peak_position = peak.position
-        peak_effect_type = peak.effect_type
-    
-    # Create attention target if we have sequence info
-    seq_len = len(ref_seq) if ref_seq else 501
-    attention_target = None
-    if affected_positions:
-        attention_target = create_position_attention_target(
-            affected_positions, seq_len
-        )
-    
-    return PositionLabelResult(
-        variant_id=variant.get_coordinate_key(),
-        affected_positions=affected_positions,
-        attention_target=attention_target,
-        peak_position=peak_position,
-        peak_effect_type=peak_effect_type,
-        sequence_length=seq_len
-    )
-
-
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
-
-def _one_hot_encode(seq: str) -> np.ndarray:
-    """One-hot encode a DNA sequence."""
-    mapping = {'A': 0, 'C': 1, 'G': 2, 'T': 3, 'N': 0}
-    seq = seq.upper()
-    indices = [mapping.get(b, 0) for b in seq]
-    oh = np.zeros((len(seq), 4), dtype=np.float32)
-    oh[np.arange(len(seq)), indices] = 1
-    return oh
-
-
-def _get_base_model_scores(
-    seq_oh: np.ndarray,
-    base_model,
-    device: str
-) -> np.ndarray:
-    """
-    Get base model scores for a one-hot encoded sequence.
-    
-    Handles both single models and ensembles.
-    """
-    # Convert to tensor [1, 4, L]
-    x = torch.tensor(seq_oh.T, dtype=torch.float32).unsqueeze(0)
-    x = x.to(device)
-    
-    # Handle ensemble
-    if isinstance(base_model, list):
-        models = base_model
-    else:
-        models = [base_model]
-    
-    with torch.no_grad():
-        preds = []
-        for model in models:
-            model.eval()
-            pred = model(x).cpu()
-            preds.append(pred)
-        
-        # Average ensemble predictions
-        avg = torch.mean(torch.stack(preds), dim=0)
-        
-        # Convert to probabilities [B, C, L] -> [L, C]
-        probs = F.softmax(avg.permute(0, 2, 1), dim=-1)
-    
-    return probs[0].numpy()  # [L, 3]
-
-
-# =============================================================================
-# STATISTICS AND ANALYSIS
-# =============================================================================
-
-def analyze_position_label_distribution(
-    variants: List[VariantRecord],
-    use_hgvs: bool = True
-) -> Dict[str, int]:
-    """
-    Analyze the distribution of position labels from HGVS parsing.
-    
-    Parameters
-    ----------
-    variants : List[VariantRecord]
-        List of variants to analyze
-    use_hgvs : bool
-        Whether to parse HGVS notation
-    
-    Returns
-    -------
-    Dict[str, int]
-        Counts by site type and confidence level
-    """
-    stats = {
-        'total': len(variants),
-        'donor': 0,
-        'acceptor': 0,
-        'deep_intronic': 0,
-        'exonic': 0,
+def effect_type_to_channel(effect_type: str) -> int:
+    """Convert effect type string to channel index."""
+    mapping = {
+        'donor_gain': 2,
+        'donor_loss': 2,
+        'acceptor_gain': 1,
+        'acceptor_loss': 1,
         'unknown': 0,
-        'canonical_region': 0,
-        'extended_region': 0,
-        'high_confidence': 0,
-        'medium_confidence': 0,
-        'low_confidence': 0,
+        'neither': 0
     }
-    
-    for variant in variants:
-        if use_hgvs:
-            hint = variant.get_position_hint()
-            stats[hint.site_type] = stats.get(hint.site_type, 0) + 1
-            
-            if hint.is_canonical_region:
-                stats['canonical_region'] += 1
-            if hint.is_extended_region:
-                stats['extended_region'] += 1
-            
-            stats[f'{hint.confidence}_confidence'] += 1
-    
-    return stats
+    return mapping.get(effect_type.lower(), 0)
 
+
+def channel_to_effect_type(channel: int, is_gain: bool) -> str:
+    """Convert channel index and direction to effect type string."""
+    if channel == 2:
+        return 'donor_gain' if is_gain else 'donor_loss'
+    elif channel == 1:
+        return 'acceptor_gain' if is_gain else 'acceptor_loss'
+    else:
+        return 'unknown'
+
+
+def summarize_affected_positions(
+    affected_positions: List[AffectedPosition]
+) -> Dict[str, any]:
+    """
+    Summarize affected positions for logging/debugging.
+    
+    Returns
+    -------
+    Dict containing:
+        - n_positions: Number of affected positions
+        - effect_types: List of unique effect types
+        - max_delta: Maximum absolute delta
+        - positions: List of position offsets
+    """
+    if not affected_positions:
+        return {
+            'n_positions': 0,
+            'effect_types': [],
+            'max_delta': 0.0,
+            'positions': []
+        }
+    
+    return {
+        'n_positions': len(affected_positions),
+        'effect_types': list(set(ap.effect_type for ap in affected_positions)),
+        'max_delta': max(abs(ap.delta_value) for ap in affected_positions),
+        'positions': [ap.position for ap in affected_positions]
+    }

@@ -1,18 +1,22 @@
 """
 Model components for the meta-layer.
 
-Classification Models:
-- MetaSpliceModel: Per-window classification (501nt → [1, 3])
-- MetaSpliceModelV2: Sequence-to-sequence (L nt → [L, 3]) - MATCHES BASE MODEL FORMAT
-- SpliceInducingClassifier: Binary "Is this variant splice-altering?" classifier
-- EffectTypeClassifier: Multi-class effect type classifier
+Classification Models (Multi-Step Framework):
+- SpliceInducingClassifier: Step 1 - Binary "Is this variant splice-altering?"
+- EffectTypeClassifier: Step 2 - Multi-class effect type classifier
+- AttentionPositionLocalizer: Step 3 - Position localization via attention
+- SegmentationPositionLocalizer: Step 3 - Position localization via segmentation
 
 Delta Prediction Models:
-- DeltaPredictor: Siamese network for paired prediction
-- DeltaPredictorV2: Per-position delta output [L, 2]
 - ValidatedDeltaPredictor: Single-pass with SpliceVarDB-validated targets (BEST)
+- DeltaPredictor: Siamese network for paired prediction (deprecated)
+- DeltaPredictorV2: Per-position delta output [L, 2]
 - SimpleCNNDeltaPredictor: Lightweight CNN for delta prediction
 - HyenaDNAValidatedDelta: HyenaDNA-based with fine-tuning support
+
+Meta-Layer Models (Per-Position Refinement):
+- MetaSpliceModel: Per-window classification (501nt → [1, 3])
+- MetaSpliceModelV2: Sequence-to-sequence (L nt → [L, 3]) - MATCHES BASE MODEL FORMAT
 
 Encoders:
 - sequence_encoder.py: DNA language model wrappers (HyenaDNA, CNN, etc.)
@@ -63,6 +67,17 @@ from .splice_classifier import (
     UnifiedSpliceClassifier,
     create_splice_classifier
 )
+from .position_localizer import (
+    AttentionPositionLocalizer,
+    SegmentationPositionLocalizer,
+    PositionAwareEncoder,
+    create_position_localizer,
+    attention_kl_loss,
+    attention_cross_entropy_loss,
+    focal_attention_loss,
+    segmentation_loss,
+    evaluate_position_localization
+)
 
 __all__ = [
     # Sequence encoders
@@ -107,5 +122,15 @@ __all__ = [
     "QuantileDeltaPredictor",
     "HybridDeltaPredictor",
     "create_calibrated_predictor",
+    # Position localization (Multi-Step Step 3)
+    "AttentionPositionLocalizer",
+    "SegmentationPositionLocalizer",
+    "PositionAwareEncoder",
+    "create_position_localizer",
+    "attention_kl_loss",
+    "attention_cross_entropy_loss",
+    "focal_attention_loss",
+    "segmentation_loss",
+    "evaluate_position_localization",
 ]
 

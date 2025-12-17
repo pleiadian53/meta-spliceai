@@ -1,0 +1,384 @@
+# HGVS Notation Tutorial: Position Hints for Splice Site Analysis
+
+**Purpose**: Understanding HGVS notation for deriving position labels  
+**Status**: 📚 Educational Reference  
+**Created**: December 2025
+
+---
+
+## Overview
+
+**HGVS (Human Genome Variation Society)** is a standardized nomenclature for describing 
+sequence variants in DNA, RNA, and protein. For splice variant analysis, HGVS notation 
+provides valuable *position hints* about where a variant is located relative to exon boundaries.
+
+However, **HGVS labels are considered "weak" compared to delta-based labels** because they 
+encode *variant location*, not *actual splice effect*. This document explains the 
+distinction and when each approach is appropriate.
+
+---
+
+## Why HGVS is a "Weak Label" Source
+
+### The Core Problem
+
+HGVS tells you **WHERE** a variant is, but not **WHAT EFFECT** it has:
+
+| Information Source | What It Tells You | What It Doesn't Tell You |
+|--------------------|-------------------|--------------------------|
+| **HGVS notation** | Variant is at donor site +1 position | Whether splicing is actually disrupted |
+| **Delta from base model** | Donor probability changed by -0.85 | N/A (directly measures effect) |
+
+### Example: Same Position, Different Effects
+
+```
+Variant A: c.123+1G>A  (HGVS: canonical donor +1)
+Variant B: c.123+1G>C  (HGVS: canonical donor +1)
+
+HGVS analysis: Both variants are at canonical donor site → Both "should" disrupt splicing
+
+Reality:
+- Variant A: Complete exon skipping (GT→AT destroys donor)
+- Variant B: Partial effect (GT→CT may have residual function due to cryptic site usage)
+
+Base model delta:
+- Variant A: Δ_donor = -0.92 at position 123
+- Variant B: Δ_donor = -0.45 at position 123, Δ_donor = +0.38 at position 178 (cryptic)
+```
+
+### Why This Matters for Training
+
+If you train a model using HGVS-derived labels:
+- **Label**: "Position 123 is affected" (from HGVS `c.123+1G>A`)
+- **Reality**: Position 123 AND position 178 are affected (cryptic activation)
+
+The model learns an incomplete picture. Delta-based labels capture the full picture.
+
+---
+
+## HGVS Notation Structure
+
+### Basic Format
+
+```
+Reference:Position.Change
+    │        │      │
+    │        │      └── What changed (e.g., G>A)
+    │        └── Where (coding position + intronic offset)
+    └── Reference sequence (e.g., NM_001234.5)
+```
+
+### Coordinate Types
+
+| Prefix | Meaning | Example |
+|--------|---------|---------|
+| `c.` | Coding DNA | `c.123G>A` (exonic) |
+| `g.` | Genomic | `g.123456G>A` (absolute position) |
+| `r.` | RNA | `r.123g>a` (after transcription) |
+| `p.` | Protein | `p.Arg123Cys` (amino acid change) |
+
+### Intronic Notation (Key for Splicing)
+
+The **intronic offset** notation tells you distance from exon boundary:
+
+```python
+# Donor site region (5' end of intron, positive offsets)
+c.123+1G>A   # 1bp into intron after exon position 123
+c.123+2T>C   # 2bp into intron
+c.123+10G>A  # 10bp into intron (extended splice region)
+
+# Acceptor site region (3' end of intron, negative offsets)
+c.456-1G>A   # 1bp before exon position 456
+c.456-2A>G   # 2bp before exon (canonical acceptor AG)
+c.456-25T>C  # 25bp before exon (polypyrimidine tract)
+```
+
+---
+
+## Using the Existing HGVS Parser
+
+We have an HGVS parser at `meta_spliceai/splice_engine/case_studies/formats/hgvs_parser.py`:
+
+```python
+from meta_spliceai.splice_engine.case_studies.formats.hgvs_parser import (
+    HGVSParser,
+    HGVSVariant
+)
+
+parser = HGVSParser()
+
+# Parse a splice site variant
+variant = parser.parse("NM_001234.5:c.670-1G>T")
+
+print(f"Position: {variant.start_position}")         # 670
+print(f"Intronic offset: {variant.intronic_offset}") # -1
+print(f"Valid: {variant.is_valid}")                  # True
+print(f"Is splice site: {parser.is_splice_site_variant(variant)}")  # True
+print(f"Site type: {parser.get_splice_site_type(variant)}")         # "acceptor"
+```
+
+### Supported Patterns
+
+| Pattern | Example | Description |
+|---------|---------|-------------|
+| Substitution | `c.123G>A` | Single nucleotide change |
+| Intronic | `c.123+1G>A` | Donor site region |
+| Intronic | `c.123-2A>G` | Acceptor site region |
+| Deletion | `c.123_125del` | Multi-base deletion |
+| Insertion | `c.123_124insGGG` | Insertion |
+| Delins | `c.123_125delinsAT` | Deletion-insertion |
+
+---
+
+## Position Hint Derivation from HGVS
+
+### Basic Approach
+
+```python
+def derive_position_hints_from_hgvs(hgvs_string: str) -> dict:
+    """
+    Extract position hints from HGVS notation.
+    
+    Returns HINTS, not definitive labels. Use for:
+    1. Pre-filtering variants
+    2. Providing weak supervision signals
+    3. Sanity checking delta-based predictions
+    """
+    parser = HGVSParser()
+    variant = parser.parse(hgvs_string)
+    
+    if not variant.is_valid:
+        return {'confidence': 'unparseable', 'hints': []}
+    
+    hints = {
+        'confidence': 'low',  # HGVS is always "low" confidence for effect prediction
+        'hints': []
+    }
+    
+    offset = variant.intronic_offset
+    
+    if offset is None:
+        # Exonic variant - could affect ESE/ESS, less direct splice effect
+        hints['hints'].append({
+            'type': 'exonic',
+            'mechanism': 'ESE/ESS disruption possible',
+            'position_confidence': 'very_low'
+        })
+    
+    elif offset > 0:  # Donor region (positive offset)
+        if offset <= 2:
+            hints['confidence'] = 'medium'  # Canonical position, more predictable
+            hints['hints'].append({
+                'type': 'donor_loss',
+                'mechanism': 'Canonical donor site disruption',
+                'canonical_region': True,
+                'offset': offset
+            })
+        elif offset <= 8:
+            hints['hints'].append({
+                'type': 'donor_loss_possible',
+                'mechanism': 'Extended splice region',
+                'canonical_region': False,
+                'offset': offset
+            })
+        else:
+            hints['hints'].append({
+                'type': 'cryptic_possible',
+                'mechanism': 'Deep intronic - cryptic site creation?',
+                'offset': offset
+            })
+    
+    else:  # Acceptor region (negative offset)
+        if abs(offset) <= 2:
+            hints['confidence'] = 'medium'
+            hints['hints'].append({
+                'type': 'acceptor_loss',
+                'mechanism': 'Canonical acceptor site disruption',
+                'canonical_region': True,
+                'offset': offset
+            })
+        elif abs(offset) <= 25:
+            hints['hints'].append({
+                'type': 'acceptor_loss_possible',
+                'mechanism': 'Polypyrimidine tract or branch point region',
+                'canonical_region': False,
+                'offset': offset
+            })
+        else:
+            hints['hints'].append({
+                'type': 'cryptic_possible',
+                'mechanism': 'Deep intronic - cryptic site creation?',
+                'offset': offset
+            })
+    
+    return hints
+```
+
+### Confidence Levels
+
+| Confidence | Meaning | When to Use |
+|------------|---------|-------------|
+| `high` | Strong evidence of effect location | **Never from HGVS alone** |
+| `medium` | Reasonable guess at effect location | Canonical splice sites (±1, ±2) |
+| `low` | Uncertain, use with caution | Extended regions (±3 to ±20) |
+| `very_low` | Speculative | Deep intronic, exonic |
+
+---
+
+## When to Use HGVS vs Delta-Based Labels
+
+### Use HGVS Labels When:
+
+1. **Pre-filtering variants** before running base model
+   ```python
+   # Quick filter: only process variants near splice sites
+   if parser.is_splice_site_variant(variant):
+       # Worth running expensive delta computation
+       delta = compute_base_model_delta(variant)
+   ```
+
+2. **No base model available** (fallback only)
+   ```python
+   if base_model_unavailable:
+       # Fall back to HGVS hints (worse but better than nothing)
+       hints = derive_position_hints_from_hgvs(variant.hgvs)
+   ```
+
+3. **Sanity checking** delta predictions
+   ```python
+   hgvs_hint = derive_position_hints_from_hgvs(variant.hgvs)
+   delta_label = derive_position_labels_from_delta(ref, alt, models)
+   
+   if hgvs_hint['type'] == 'donor_loss' and delta_label.effect_type == 'acceptor_gain':
+       # Unusual: HGVS says donor, delta says acceptor
+       # Flag for manual review
+       flag_for_review(variant)
+   ```
+
+4. **Weak supervision** in semi-supervised learning
+   ```python
+   # Use HGVS as weak labels for unlabeled variants
+   weak_labels = {v.id: derive_position_hints_from_hgvs(v.hgvs) for v in unlabeled}
+   ```
+
+### Use Delta-Based Labels When:
+
+1. **Training position localization models** (primary recommendation)
+2. **Need accurate effect location**, not just variant location
+3. **Multiple effects possible** (gain + loss, cryptic activation)
+4. **Quantitative analysis** (how much effect, not just where)
+
+---
+
+## HGVS Pattern Reference
+
+### Splice Site Classification Table
+
+| HGVS Pattern | Distance | Region | Likely Effect | Confidence |
+|--------------|----------|--------|---------------|------------|
+| `c.XXX+1` | +1 | Canonical donor GT | Donor loss | Medium |
+| `c.XXX+2` | +2 | Canonical donor GT | Donor loss | Medium |
+| `c.XXX+3..+8` | +3 to +8 | Extended donor | Donor loss possible | Low |
+| `c.XXX-1` | -1 | Canonical acceptor AG | Acceptor loss | Medium |
+| `c.XXX-2` | -2 | Canonical acceptor AG | Acceptor loss | Medium |
+| `c.XXX-3..-25` | -3 to -25 | Polypyrimidine tract | Acceptor weakening | Low |
+| `c.XXX-26..-50` | -26 to -50 | Branch point region | Acceptor weakening | Very low |
+| `c.XXX+N` (N > 10) | Deep 5' | Deep intronic | Cryptic creation? | Very low |
+| `c.XXX-N` (N > 50) | Deep 3' | Deep intronic | Cryptic creation? | Very low |
+| `c.XXX` (no offset) | 0 | Exonic | ESE/ESS disruption? | Very low |
+
+### Canonical Splice Site Sequences
+
+```
+                    EXON          INTRON
+Donor site:    ...MAG|gtaagt...
+                  -2-1+1+2+3+4+5+6
+
+                    INTRON         EXON
+Acceptor site: ...yyyyyyyyag|G...
+               -30        -2-1+1
+```
+
+Where:
+- `M` = A or C
+- `gt` = canonical donor (rarely GC)
+- `ag` = canonical acceptor
+- `y` = pyrimidine (C or T) in polypyrimidine tract
+
+---
+
+## Integration with Position Labels Module
+
+The `data/position_labels.py` module provides an HGVS-based derivation function:
+
+```python
+from meta_spliceai.splice_engine.meta_layer.data.position_labels import (
+    derive_position_from_hgvs
+)
+
+# Parse HGVS and get position hint
+affected_pos = derive_position_from_hgvs("c.123+1G>A")
+
+if affected_pos:
+    print(f"Effect type: {affected_pos.effect_type}")  # 'donor_loss'
+    print(f"Channel: {affected_pos.channel}")          # 2 (donor)
+    print(f"Confidence: weak (from HGVS)")
+```
+
+**Important**: This returns a position hint with **placeholder delta value**. 
+The actual delta must come from base model computation.
+
+---
+
+## Alternative Data Sources for Position Labels
+
+### Compared to ClinVar
+
+| Aspect | HGVS (from SpliceVarDB) | ClinVar |
+|--------|-------------------------|---------|
+| Position specificity | Variant location only | Variant location + some consequence annotation |
+| Effect annotation | Implicit (inferred from location) | `MC` field with consequence type |
+| Actual isoform data | **No** | **No** |
+| Ground truth quality | Experimentally validated | Mixed (computational + clinical) |
+
+**Key insight**: Neither SpliceVarDB nor ClinVar provide **actual isoform data** (i.e., 
+GTF annotations of aberrant transcripts resulting from the variant). Both provide:
+- Variant genomic coordinates
+- Classification of effect type (splice-altering vs normal)
+- But NOT the precise positions of cryptic splice sites or alternative exons
+
+### For True Position Ground Truth
+
+To get **actual splice isoform data** (alternative transcripts), you would need:
+1. **RNA-seq data** from variant carriers showing aberrant transcripts
+2. **Long-read sequencing** (PacBio/ONT) with full transcript isoforms
+3. **Minigene assay results** with splicing outcomes
+
+These are typically available in:
+- **Individual papers** (case studies)
+- **DBASS** (Database of Aberrant 3' and 5' Splice Sites) - has some
+- **SpliceAI supplementary data** - has some validated examples
+
+---
+
+## Summary
+
+| Label Source | Pros | Cons | Best Use |
+|--------------|------|------|----------|
+| **Delta from base model** | Quantitative, captures all effects | Depends on model quality | Primary training labels |
+| **HGVS notation** | Fast, no model needed | Location ≠ effect, misses cryptics | Pre-filtering, weak supervision |
+| **SpliceVarDB classification** | Ground truth filtering | Binary (altering/normal), no positions | Validating delta labels |
+| **ClinVar MC field** | Consequence annotation | Coarse categories | Filtering by consequence |
+
+**Recommended approach**: Use delta-based labels (validated by SpliceVarDB) as primary 
+training signal, with HGVS hints for pre-filtering and sanity checking.
+
+---
+
+## See Also
+
+- `case_studies/formats/hgvs_parser.py` - HGVS parser implementation
+- `data/position_labels.py` - Position label derivation utilities
+- `docs/methods/MULTI_STEP_FRAMEWORK.md` - Multi-Step Framework documentation
+- `docs/data/SPLICEVARDB.md` - SpliceVarDB dataset documentation
+
