@@ -242,6 +242,160 @@ python -c "from meta_spliceai.system.genomic_resources import load_config; print
 
 ---
 
+## Issue 2: FASTA File Path Resolution
+
+**Updated**: December 17, 2025
+
+### Symptoms
+
+```python
+FileNotFoundError: FASTA file not found for build GRCh38, release 112
+```
+
+### Root Cause
+
+The `Registry.get_fasta_path()` method looks for the FASTA file based on the `genomic_resources.yaml` configuration, which may expect the file in a different location than where it's actually stored.
+
+The FASTA file location depends on the annotation source:
+- **Ensembl**: `data/ensembl/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa`
+- **MANE** (OpenSpliceAI): `data/mane/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa`
+
+### Quick Fix: Environment Variable
+
+Set the FASTA path explicitly:
+
+```bash
+export SS_FASTA_PATH=/workspace/meta-spliceai/data/mane/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
+```
+
+### Complete RunPods Environment Setup
+
+Add to `~/.bashrc` for persistent configuration:
+
+```bash
+# Meta-SpliceAI RunPods Environment
+export META_SPLICEAI_ROOT=/workspace/meta-spliceai
+export SS_DATA_ROOT=/workspace/meta-spliceai/data
+export SS_FASTA_PATH=/workspace/meta-spliceai/data/mane/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
+
+# Create symlink for backwards compatibility
+mkdir -p /root/work 2>/dev/null
+[ ! -L /root/work/meta-spliceai ] && ln -sf /workspace/meta-spliceai /root/work/meta-spliceai 2>/dev/null
+
+# Activate conda environment
+eval "$(/workspace/miniforge3/bin/mamba shell hook --shell bash)"
+mamba activate metaspliceai
+```
+
+### Data Directory Structure
+
+Expected structure on RunPods:
+
+```
+/workspace/meta-spliceai/data/
+├── mane/
+│   └── GRCh38/
+│       ├── Homo_sapiens.GRCh38.dna.primary_assembly.fa    # FASTA genome
+│       ├── Homo_sapiens.GRCh38.dna.primary_assembly.fa.fai
+│       └── openspliceai_eval/                              # Model outputs
+├── models/
+│   └── openspliceai/                                       # Base models
+│       ├── model_10000nt_rs10.pt
+│       ├── model_10000nt_rs11.pt
+│       ├── model_10000nt_rs12.pt
+│       ├── model_10000nt_rs13.pt
+│       └── model_10000nt_rs14.pt
+└── splicevardb/
+    └── splicevardb.download.tsv                            # Variant database
+```
+
+### Verify FASTA Access
+
+```python
+from pyfaidx import Fasta
+import os
+
+fasta_path = os.getenv('SS_FASTA_PATH', 
+    '/workspace/meta-spliceai/data/mane/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa')
+
+try:
+    fasta = Fasta(fasta_path, sequence_always_upper=True, rebuild=False)
+    print(f"✅ FASTA loaded: {len(fasta.keys())} chromosomes")
+    print(f"   Example: chr1 length = {len(fasta['1'])}")
+except Exception as e:
+    print(f"❌ FASTA error: {e}")
+```
+
+---
+
+## Issue 3: OpenSpliceAI Model Path
+
+### Symptoms
+
+```python
+FileNotFoundError: OpenSpliceAI models not found at data/models/openspliceai/. 
+Please run: ./scripts/base_model/download_openspliceai_models.sh
+```
+
+### Solution
+
+Run the download script:
+
+```bash
+cd /workspace/meta-spliceai
+bash scripts/base_model/download_openspliceai_models.sh
+```
+
+This downloads 5 OpenSpliceAI model checkpoints (~14MB total):
+- `model_10000nt_rs10.pt` through `model_10000nt_rs14.pt`
+
+### Verify Models
+
+```python
+from meta_spliceai.splice_engine.base_models import load_base_model_ensemble
+
+models, metadata = load_base_model_ensemble('openspliceai', context=10000, verbosity=0)
+print(f"✅ Loaded {len(models)} OpenSpliceAI models on {metadata['device']}")
+```
+
+---
+
+## Summary: Complete RunPods Quick Setup
+
+Run this after cloning the repository:
+
+```bash
+# 1. Download OpenSpliceAI models
+cd /workspace/meta-spliceai
+bash scripts/base_model/download_openspliceai_models.sh
+
+# 2. Set environment variables
+export SS_FASTA_PATH=/workspace/meta-spliceai/data/mane/GRCh38/Homo_sapiens.GRCh38.dna.primary_assembly.fa
+
+# 3. Verify everything works
+python -c "
+from meta_spliceai.splice_engine.meta_layer.data.splicevardb_loader import load_splicevardb
+from meta_spliceai.splice_engine.base_models import load_base_model_ensemble
+from pyfaidx import Fasta
+import os
+
+# Test SpliceVarDB
+loader = load_splicevardb(genome_build='GRCh38')
+variants = loader.load_all()
+print(f'✅ SpliceVarDB: {len(variants):,} variants')
+
+# Test FASTA
+fasta = Fasta(os.getenv('SS_FASTA_PATH'), sequence_always_upper=True, rebuild=False)
+print(f'✅ FASTA: {len(fasta.keys())} chromosomes')
+
+# Test OpenSpliceAI
+models, meta = load_base_model_ensemble('openspliceai', context=10000, verbosity=0)
+print(f'✅ OpenSpliceAI: {len(models)} models on {meta[\"device\"]}')
+"
+```
+
+---
+
 ## Related Documentation
 
 - [RUNPODS_COMPLETE_SETUP.md](./RUNPODS_COMPLETE_SETUP.md) - Full setup guide
