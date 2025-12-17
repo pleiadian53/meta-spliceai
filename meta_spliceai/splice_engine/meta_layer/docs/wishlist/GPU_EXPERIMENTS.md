@@ -111,6 +111,30 @@ model = HyenaDNADeltaPredictor(
 
 ---
 
+## 🚀 Experiment Script
+
+A comprehensive GPU experiment script is available:
+
+```bash
+# Quick test (sanity check):
+python -m meta_spliceai.splice_engine.meta_layer.tests.test_gpu_validated_delta_experiments \
+    --exp quick_test --device cuda
+
+# Full 50K dataset:
+python -m meta_spliceai.splice_engine.meta_layer.tests.test_gpu_validated_delta_experiments \
+    --exp full_dataset --device cuda
+
+# HyenaDNA-small:
+python -m meta_spliceai.splice_engine.meta_layer.tests.test_gpu_validated_delta_experiments \
+    --exp hyenadna --device cuda
+
+# Run all experiments:
+python -m meta_spliceai.splice_engine.meta_layer.tests.test_gpu_validated_delta_experiments \
+    --exp all --device cuda
+```
+
+---
+
 ## ✅ Completed Experiments
 
 Move experiments here after completion:
