@@ -1,9 +1,14 @@
 import os, sys
 
+# Import dynamic project root detection
+from meta_spliceai.system.config import Config
+
+
 class ExperimentTracker(object):
 
     home_dir = os.path.expanduser("~")
-    data_prefix = f"{home_dir}/work/meta-spliceai" 
+    # Use dynamic project root instead of hardcoded path
+    data_prefix = Config.PROJ_DIR
     experiment_root = 'experiments'
     # Options: "/mnt/SpliceMediator/splice-mediator/experiments/"
     #          f"{home_dir}/work/nmd/experiments" 
