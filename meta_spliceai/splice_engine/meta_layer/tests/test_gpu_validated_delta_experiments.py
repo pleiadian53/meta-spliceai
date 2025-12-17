@@ -279,6 +279,10 @@ class GPUExperimentConfig:
     gradient_accumulation: int = 1
     description: str = ""
     device: str = "cuda"
+    # Early stopping parameters
+    val_split: float = 0.15  # Fraction of training data for validation
+    patience: int = 5  # Early stopping patience (epochs without improvement)
+    min_delta: float = 1e-4  # Minimum improvement to reset patience
 
 
 @dataclass
@@ -639,6 +643,25 @@ def run_experiment(config: GPUExperimentConfig) -> Dict:
     gc.collect()
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
     
+    # Split training data for validation (early stopping)
+    if config.val_split > 0:
+        val_size = int(len(train_samples) * config.val_split)
+        random.shuffle(train_samples)
+        val_samples = train_samples[:val_size]
+        train_samples = train_samples[val_size:]
+        logger.info(f"   Split: {len(train_samples)} train, {len(val_samples)} validation")
+        
+        val_loader = DataLoader(
+            SampleDataset(val_samples),
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True
+        )
+    else:
+        val_loader = None
+        val_samples = []
+    
     train_loader = DataLoader(
         SampleDataset(train_samples),
         batch_size=config.batch_size,
@@ -688,18 +711,58 @@ def run_experiment(config: GPUExperimentConfig) -> Dict:
     )
     scaler = torch.amp.GradScaler('cuda', enabled=config.use_amp)
     
-    # Training loop
-    best_loss = float('inf')
+    # Training loop with early stopping
+    best_val_loss = float('inf')
+    best_model_state = None
+    patience_counter = 0
+    stopped_early = False
+    
     for epoch in range(config.epochs):
-        loss = train_epoch(model, train_loader, optimizer, scheduler, device, scaler, config)
+        train_loss = train_epoch(model, train_loader, optimizer, scheduler, device, scaler, config)
         
-        if loss < best_loss:
-            best_loss = loss
-        
-        if (epoch + 1) % 10 == 0 or epoch == 0:
-            logger.info(f"   Epoch {epoch+1}/{config.epochs}: loss = {loss:.6f}")
-            if torch.cuda.is_available():
-                logger.info(f"      GPU memory: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+        # Validation loss for early stopping
+        if val_loader is not None:
+            model.eval()
+            val_losses = []
+            with torch.no_grad():
+                for batch in val_loader:
+                    alt_seq = batch['alt_seq'].to(device)
+                    ref_base = batch['ref_base'].to(device)
+                    alt_base = batch['alt_base'].to(device)
+                    target = batch['target_delta'].to(device)
+                    
+                    with torch.amp.autocast('cuda', enabled=config.use_amp):
+                        pred = model(alt_seq, ref_base, alt_base)
+                        loss = F.mse_loss(pred, target)
+                    val_losses.append(loss.item())
+            val_loss = np.mean(val_losses)
+            
+            # Early stopping check
+            if val_loss < best_val_loss - config.min_delta:
+                best_val_loss = val_loss
+                best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+                patience_counter = 0
+            else:
+                patience_counter += 1
+            
+            if (epoch + 1) % 5 == 0 or epoch == 0:
+                logger.info(f"   Epoch {epoch+1}/{config.epochs}: train_loss = {train_loss:.6f}, val_loss = {val_loss:.6f}, patience = {patience_counter}/{config.patience}")
+            
+            # Early stopping
+            if patience_counter >= config.patience:
+                logger.info(f"   Early stopping at epoch {epoch+1}! Best val_loss = {best_val_loss:.6f}")
+                stopped_early = True
+                break
+        else:
+            if (epoch + 1) % 10 == 0 or epoch == 0:
+                logger.info(f"   Epoch {epoch+1}/{config.epochs}: loss = {train_loss:.6f}")
+                if torch.cuda.is_available():
+                    logger.info(f"      GPU memory: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+    
+    # Restore best model if early stopping was used
+    if best_model_state is not None:
+        model.load_state_dict({k: v.to(device) for k, v in best_model_state.items()})
+        logger.info(f"   Restored best model (val_loss = {best_val_loss:.6f})")
     
     # Prepare test data
     logger.info("\n5. Preparing test data...")
@@ -779,7 +842,8 @@ def main():
     parser = argparse.ArgumentParser(description="GPU ValidatedDeltaPredictor experiments")
     parser.add_argument('--exp', type=str, default='all',
                         choices=['all', 'full_dataset', 'hyenadna', 'hyenadna_medium', 
-                                 'long_context', 'quick_test'],
+                                 'long_context', 'quick_test', 'early_stopping',
+                                 'early_stopping_regularized'],
                         help='Which experiment to run')
     parser.add_argument('--device', type=str, default='cuda',
                         choices=['cuda', 'cpu'],
@@ -849,6 +913,36 @@ def main():
             n_layers=8,
             device=args.device,
             description="Longer context window for distant regulatory elements"
+        ),
+        'early_stopping': GPUExperimentConfig(
+            name="Full Dataset with Early Stopping",
+            max_train=50000,
+            max_test=2000,
+            epochs=100,  # Max epochs (will stop early)
+            batch_size=128,
+            hidden_dim=256,
+            n_layers=8,
+            device=args.device,
+            val_split=0.15,  # 15% validation
+            patience=7,  # Stop after 7 epochs without improvement
+            min_delta=1e-5,  # Minimum improvement threshold
+            description="Full dataset with early stopping to prevent overfitting"
+        ),
+        'early_stopping_regularized': GPUExperimentConfig(
+            name="Full Dataset with Early Stopping + Regularization",
+            max_train=50000,
+            max_test=2000,
+            epochs=100,  # Max epochs (will stop early)
+            batch_size=128,
+            hidden_dim=128,  # Smaller model
+            n_layers=6,  # Fewer layers
+            learning_rate=5e-5,  # Lower learning rate
+            weight_decay=0.05,  # More regularization
+            device=args.device,
+            val_split=0.15,  # 15% validation
+            patience=10,  # More patience
+            min_delta=1e-5,
+            description="Regularized model with early stopping"
         ),
     }
     
