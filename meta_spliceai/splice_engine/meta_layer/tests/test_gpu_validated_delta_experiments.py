@@ -94,6 +94,11 @@ class HyenaDNAValidatedDeltaPredictor(nn.Module):
                                     [Fusion + Delta Head]
                                                 ↓
                                         Δ = [Δ_donor, Δ_acceptor, Δ_neither]
+    
+    Fine-tuning Modes:
+        - freeze_encoder=True: All encoder weights frozen (transfer learning)
+        - freeze_encoder=False, unfreeze_last_n=0: All encoder weights trainable
+        - freeze_encoder=False, unfreeze_last_n=N: Only last N layers trainable
     """
     
     def __init__(
@@ -101,6 +106,7 @@ class HyenaDNAValidatedDeltaPredictor(nn.Module):
         model_name: str = 'hyenadna-small-32k',
         hidden_dim: int = 256,
         freeze_encoder: bool = True,
+        unfreeze_last_n: int = 0,
         dropout: float = 0.1
     ):
         super().__init__()
@@ -108,14 +114,13 @@ class HyenaDNAValidatedDeltaPredictor(nn.Module):
         self.model_name = model_name
         self.hidden_dim = hidden_dim
         self.freeze_encoder = freeze_encoder
+        self.unfreeze_last_n = unfreeze_last_n
         
         # Load HyenaDNA encoder
-        self.encoder, self.encoder_dim = self._load_hyenadna(model_name)
+        self.encoder, self.encoder_dim, self.num_layers = self._load_hyenadna(model_name)
         
-        if freeze_encoder and self.encoder is not None:
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-            logger.info(f"HyenaDNA encoder frozen (dim={self.encoder_dim})")
+        # Apply freezing strategy
+        self._apply_freeze_strategy()
         
         # Projection from HyenaDNA dim to hidden_dim
         self.proj = nn.Linear(self.encoder_dim, hidden_dim)
@@ -140,7 +145,100 @@ class HyenaDNAValidatedDeltaPredictor(nn.Module):
         
         logger.info(f"HyenaDNAValidatedDeltaPredictor initialized with {model_name}")
     
-    def _load_hyenadna(self, model_name: str) -> Tuple[Optional[nn.Module], int]:
+    def _apply_freeze_strategy(self):
+        """Apply the freezing strategy to encoder layers."""
+        if self.encoder is None or isinstance(self.encoder, nn.Sequential):
+            return  # CNN fallback, nothing to freeze
+        
+        if self.freeze_encoder:
+            # Freeze all encoder parameters
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            logger.info(f"HyenaDNA encoder fully frozen (dim={self.encoder_dim})")
+        elif self.unfreeze_last_n > 0 and self.num_layers > 0:
+            # Gradual unfreezing: freeze all, then unfreeze last N layers
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            
+            # Find and unfreeze the last N layers
+            unfrozen_count = self._unfreeze_last_n_layers(self.unfreeze_last_n)
+            logger.info(f"HyenaDNA: Unfroze last {unfrozen_count} layer blocks "
+                       f"(out of {self.num_layers} total)")
+        else:
+            # Fully trainable
+            logger.info(f"HyenaDNA encoder fully trainable (dim={self.encoder_dim})")
+    
+    def _unfreeze_last_n_layers(self, n: int) -> int:
+        """Unfreeze the last N transformer/hyena layers."""
+        unfrozen = 0
+        
+        # HyenaDNA structure: backbone.layers is a ModuleList
+        if hasattr(self.encoder, 'backbone') and hasattr(self.encoder.backbone, 'layers'):
+            layers = self.encoder.backbone.layers
+            total_layers = len(layers)
+            start_idx = max(0, total_layers - n)
+            
+            for i in range(start_idx, total_layers):
+                for param in layers[i].parameters():
+                    param.requires_grad = True
+                unfrozen += 1
+            
+            # Also unfreeze the final layer norm if present
+            if hasattr(self.encoder.backbone, 'norm_f'):
+                for param in self.encoder.backbone.norm_f.parameters():
+                    param.requires_grad = True
+        
+        return unfrozen
+    
+    def get_param_groups(self, base_lr: float, encoder_lr_mult: float = 0.1):
+        """
+        Get parameter groups with discriminative learning rates.
+        
+        Parameters
+        ----------
+        base_lr : float
+            Base learning rate for new layers (projection, head, etc.)
+        encoder_lr_mult : float
+            Multiplier for encoder learning rate (e.g., 0.1 = 10x lower)
+        
+        Returns
+        -------
+        List[Dict]
+            Parameter groups for optimizer
+        """
+        encoder_params = []
+        new_params = []
+        
+        for name, param in self.named_parameters():
+            if not param.requires_grad:
+                continue
+            
+            if 'encoder' in name:
+                encoder_params.append(param)
+            else:
+                new_params.append(param)
+        
+        param_groups = []
+        if encoder_params:
+            param_groups.append({
+                'params': encoder_params,
+                'lr': base_lr * encoder_lr_mult,
+                'name': 'encoder'
+            })
+        if new_params:
+            param_groups.append({
+                'params': new_params,
+                'lr': base_lr,
+                'name': 'head'
+            })
+        
+        logger.info(f"Parameter groups: encoder={len(encoder_params)} params "
+                   f"(lr={base_lr * encoder_lr_mult:.2e}), "
+                   f"head={len(new_params)} params (lr={base_lr:.2e})")
+        
+        return param_groups
+    
+    def _load_hyenadna(self, model_name: str) -> Tuple[Optional[nn.Module], int, int]:
         """Load HyenaDNA model from HuggingFace."""
         try:
             from transformers import AutoModelForCausalLM
@@ -162,12 +260,20 @@ class HyenaDNAValidatedDeltaPredictor(nn.Module):
             else:
                 embed_dim = 256
             
-            logger.info(f"HyenaDNA loaded: {model_name}, dim={embed_dim}")
-            return model, embed_dim
+            # Get number of layers
+            if hasattr(model.config, 'n_layer'):
+                num_layers = model.config.n_layer
+            elif hasattr(model.config, 'num_hidden_layers'):
+                num_layers = model.config.num_hidden_layers
+            else:
+                num_layers = 4  # Default
+            
+            logger.info(f"HyenaDNA loaded: {model_name}, dim={embed_dim}, layers={num_layers}")
+            return model, embed_dim, num_layers
             
         except Exception as e:
             logger.warning(f"Could not load HyenaDNA: {e}. Using CNN fallback.")
-            return self._create_fallback_encoder(), 256
+            return self._create_fallback_encoder(), 256, 0
     
     def _create_fallback_encoder(self) -> nn.Module:
         """Create a CNN fallback if HyenaDNA is not available."""
@@ -275,6 +381,8 @@ class GPUExperimentConfig:
     use_hyenadna: bool = False
     hyenadna_model: str = 'hyenadna-small-32k'
     freeze_encoder: bool = True
+    unfreeze_last_n: int = 0  # Number of encoder layers to unfreeze (for fine-tuning)
+    encoder_lr_mult: float = 0.1  # Learning rate multiplier for unfrozen encoder layers
     use_amp: bool = True  # Automatic Mixed Precision
     gradient_accumulation: int = 1
     description: str = ""
@@ -677,6 +785,7 @@ def run_experiment(config: GPUExperimentConfig) -> Dict:
             model_name=config.hyenadna_model,
             hidden_dim=config.hidden_dim,
             freeze_encoder=config.freeze_encoder,
+            unfreeze_last_n=config.unfreeze_last_n,
             dropout=0.1
         )
     else:
@@ -689,20 +798,38 @@ def run_experiment(config: GPUExperimentConfig) -> Dict:
     model = model.to(device)
     n_params = sum(p.numel() for p in model.parameters())
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"   Device: {device}")
     logger.info(f"   Total params: {n_params:,}")
     logger.info(f"   Trainable params: {n_trainable:,}")
     
     if torch.cuda.is_available():
         logger.info(f"   GPU memory allocated: {torch.cuda.memory_allocated() / 1e9:.2f} GB")
+    logger.info(f"   Total parameters: {n_params:,}")
+    logger.info(f"   Trainable parameters: {n_trainable:,}")
     
     # Training setup
     logger.info("\n4. Training...")
-    optimizer = torch.optim.AdamW(
-        model.parameters(), 
-        lr=config.learning_rate, 
-        weight_decay=config.weight_decay
-    )
+    
+    # Use discriminative learning rates for HyenaDNA fine-tuning
+    if config.use_hyenadna and not config.freeze_encoder and config.unfreeze_last_n > 0:
+        # Get parameter groups with different learning rates
+        param_groups = model.get_param_groups(
+            base_lr=config.learning_rate,
+            encoder_lr_mult=config.encoder_lr_mult
+        )
+        optimizer = torch.optim.AdamW(
+            param_groups, 
+            weight_decay=config.weight_decay
+        )
+        logger.info(f"   Using discriminative LR: encoder={config.learning_rate * config.encoder_lr_mult:.2e}, head={config.learning_rate:.2e}")
+    else:
+        optimizer = torch.optim.AdamW(
+            model.parameters(), 
+            lr=config.learning_rate, 
+            weight_decay=config.weight_decay
+        )
+    
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer, 
         max_lr=config.learning_rate * 10, 
@@ -842,6 +969,7 @@ def main():
     parser = argparse.ArgumentParser(description="GPU ValidatedDeltaPredictor experiments")
     parser.add_argument('--exp', type=str, default='all',
                         choices=['all', 'full_dataset', 'hyenadna', 'hyenadna_medium', 
+                                 'hyenadna_finetune', 'hyenadna_finetune_deep',
                                  'long_context', 'quick_test', 'early_stopping',
                                  'early_stopping_regularized'],
                         help='Which experiment to run')
@@ -903,6 +1031,46 @@ def main():
             gradient_accumulation=4,
             device=args.device,
             description="HyenaDNA-medium encoder (requires A40+)"
+        ),
+        'hyenadna_finetune': GPUExperimentConfig(
+            name="HyenaDNA-medium Fine-tuned",
+            max_train=25000,
+            max_test=1000,
+            epochs=50,  # Will stop early
+            batch_size=16,  # Smaller batch for memory
+            hidden_dim=256,
+            use_hyenadna=True,
+            hyenadna_model='hyenadna-medium-160k',
+            freeze_encoder=False,  # Allow unfreezing
+            unfreeze_last_n=2,  # Unfreeze last 2 layers
+            encoder_lr_mult=0.1,  # 10x lower LR for encoder
+            learning_rate=5e-5,  # Lower base LR for stability
+            weight_decay=0.01,
+            gradient_accumulation=4,
+            device=args.device,
+            val_split=0.15,
+            patience=10,  # More patience for fine-tuning
+            description="HyenaDNA-medium with last 2 layers fine-tuned"
+        ),
+        'hyenadna_finetune_deep': GPUExperimentConfig(
+            name="HyenaDNA-medium Fine-tuned (Deep)",
+            max_train=25000,
+            max_test=1000,
+            epochs=50,
+            batch_size=8,  # Even smaller batch for more layers
+            hidden_dim=256,
+            use_hyenadna=True,
+            hyenadna_model='hyenadna-medium-160k',
+            freeze_encoder=False,
+            unfreeze_last_n=4,  # Unfreeze last 4 layers
+            encoder_lr_mult=0.05,  # 20x lower LR for encoder
+            learning_rate=3e-5,  # Even lower base LR
+            weight_decay=0.02,  # More regularization
+            gradient_accumulation=8,
+            device=args.device,
+            val_split=0.15,
+            patience=10,
+            description="HyenaDNA-medium with last 4 layers fine-tuned"
         ),
         'long_context': GPUExperimentConfig(
             name="Long Context (1001nt)",

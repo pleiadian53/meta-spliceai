@@ -12,6 +12,7 @@ Delta Prediction Models:
 - DeltaPredictorV2: Per-position delta output [L, 2]
 - ValidatedDeltaPredictor: Single-pass with SpliceVarDB-validated targets (BEST)
 - SimpleCNNDeltaPredictor: Lightweight CNN for delta prediction
+- HyenaDNAValidatedDelta: HyenaDNA-based with fine-tuning support
 
 Encoders:
 - sequence_encoder.py: DNA language model wrappers (HyenaDNA, CNN, etc.)
@@ -49,6 +50,12 @@ from .validated_delta_predictor import (
     ValidatedDeltaPredictor,
     ValidatedDeltaPredictorWithAttention,
     create_validated_delta_predictor
+)
+from .hyenadna_validated_delta import (
+    HyenaDNAValidatedDelta,
+    HyenaDNAConfig,
+    create_hyenadna_model,
+    create_finetuned_model
 )
 from .splice_classifier import (
     SpliceInducingClassifier,
@@ -89,6 +96,11 @@ __all__ = [
     "ValidatedDeltaPredictor",
     "ValidatedDeltaPredictorWithAttention",
     "create_validated_delta_predictor",
+    # HyenaDNA-based validated delta (with fine-tuning support)
+    "HyenaDNAValidatedDelta",
+    "HyenaDNAConfig",
+    "create_hyenadna_model",
+    "create_finetuned_model",
     # Calibrated predictors
     "ScaledDeltaPredictor",
     "TemperatureScaledPredictor",
