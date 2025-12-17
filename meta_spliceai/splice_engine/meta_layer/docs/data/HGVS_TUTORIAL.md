@@ -72,26 +72,221 @@ Reference:Position.Change
 
 | Prefix | Meaning | Example |
 |--------|---------|---------|
-| `c.` | Coding DNA | `c.123G>A` (exonic) |
-| `g.` | Genomic | `g.123456G>A` (absolute position) |
+| `c.` | Coding DNA (CDS position) | `c.123G>A` (exonic) |
+| `g.` | Genomic (chromosome position) | `g.123456G>A` (absolute position) |
 | `r.` | RNA | `r.123g>a` (after transcription) |
 | `p.` | Protein | `p.Arg123Cys` (amino acid change) |
 
-### Intronic Notation (Key for Splicing)
+---
 
-The **intronic offset** notation tells you distance from exon boundary:
+## Understanding c. Notation: What Does c.123 Mean?
+
+### c. = CDS (Coding DNA Sequence) Position
+
+The `c.` notation refers to the **position within the coding sequence**:
+
+```
+c.123 = The 123rd nucleotide in the CDS
+      = Position 123 counting from the first base of the START codon (ATG)
+```
+
+**Key points:**
+- It is **NOT** a genomic coordinate (that would be `g.`)
+- It is **NOT** an exon number
+- It is **transcript-relative** (different transcripts have different c. numbering)
+- Only counts nucleotides that will be translated to protein
+
+### How Do We Know Which Gene?
+
+The gene is specified by the **reference sequence prefix**:
+
+```
+NM_000492.4:c.1521+1G>A
+│         │ │
+│         │ └── CDS position 1521
+│         └── Transcript version
+└── RefSeq transcript accession (this is CFTR)
+```
+
+| Prefix | Meaning | Example |
+|--------|---------|---------|
+| `NM_` | mRNA (coding transcript) | `NM_000492.4` (CFTR) |
+| `NR_` | Non-coding RNA | `NR_046018.2` |
+| `NP_` | Protein | `NP_000483.3` |
+| `NC_` | Genomic (chromosome) | `NC_000007.14` (chr7) |
+| `NG_` | Genomic (gene region) | `NG_016465.4` (CFTR gene) |
+
+**Without the prefix, the gene is ambiguous.** Many databases omit it when context is clear.
+
+---
+
+## Exon vs CDS: Understanding the Relationship
+
+**Critical distinction: Exons ≠ CDS**
+
+### Visual Overview
+
+```
+GENE STRUCTURE (DNA → mRNA → Protein)
+══════════════════════════════════════════════════════════════════════════════
+
+GENOMIC DNA:
+5' ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3'
+
+TRANSCRIPT (after splicing):
+     ┌───────────────────────── mRNA ─────────────────────────┐
+     │                                                         │
+     │  ┌───┐   ┌─────────┐   ┌───────────┐   ┌───────┐  ┌──┐ │
+     │  │ E1│   │   E2    │   │    E3     │   │  E4   │  │E5│ │
+     │  └───┘   └─────────┘   └───────────┘   └───────┘  └──┘ │
+     │    │         │              │              │        │   │
+     │  5'UTR    CODING        CODING         CODING    3'UTR  │
+     │    │         │              │              │        │   │
+     │    │    ┌────┴──────────────┴──────────────┴────┐   │   │
+     │    │    │           CDS (translated)           │   │   │
+     │    │    │      ATG ─────────────────── STOP    │   │   │
+     │    │    └──────────────────────────────────────┘   │   │
+     │    │         │                              │      │   │
+     │ Not CDS    c.1                           c.END  Not CDS │
+     └─────────────────────────────────────────────────────────┘
+
+Legend:
+  ───── Introns (spliced out, not in mRNA)
+  ┌───┐ Exons (included in mRNA)
+  CDS   Coding sequence (translated to protein)
+  UTR   Untranslated regions (in mRNA but not translated)
+```
+
+### Detailed Breakdown
+
+```
+            EXON 1          EXON 2              EXON 3           EXON 4
+           ┌────────┐     ┌──────────┐        ┌──────────┐     ┌────────┐
+mRNA:      │5'UTR│C│     │ CODING   │        │ CODING   │     │C│3'UTR │
+           └────────┘     └──────────┘        └──────────┘     └────────┘
+              │  │             │                   │            │
+              │  │             │                   │            │
+              │ c.1          c.150               c.450        c.600
+              │ (ATG)                                         (STOP)
+              │
+           Not in CDS
+           (5' UTR)
+
+Key insight:
+- Exon 1 contains 5'UTR (untranslated) + start of CDS
+- Exons 2-3 are entirely within CDS  
+- Exon 4 contains end of CDS + 3'UTR (untranslated)
+- c. numbering ONLY covers the ATG-to-STOP region
+```
+
+### What Each Region Contains
+
+| Region | In Exons? | In CDS? | c. Notation | Translated? |
+|--------|-----------|---------|-------------|-------------|
+| 5' UTR | ✅ Yes | ❌ No | `c.-N` (negative) | ❌ No |
+| Coding | ✅ Yes | ✅ Yes | `c.1` to `c.END` | ✅ Yes |
+| 3' UTR | ✅ Yes | ❌ No | `c.*N` (asterisk) | ❌ No |
+| Introns | ❌ No | ❌ No | `c.X+N` or `c.X-N` | ❌ No |
+
+---
+
+## Intronic Offset Notation Explained
+
+The `+` and `-` offsets indicate distance from the **CDS exon boundary**:
+
+### Donor Site Region (5' end of intron)
+
+```
+                     EXON (CDS)                        INTRON
+              ...━━━━━━━━━━━━━━━━━━━━┫ ┃━━━━━━━━━━━━━━━━━━━━━━...
+                                    ┃ ┃
+                     c.123          ┃ ┃ c.123+1   c.123+2   c.123+3
+                    (last CDS       ┃ ┃  (1bp      (2bp      (3bp
+                     base of        ┃ ┃   into     into      into
+                     this exon)     ┃ ┃  intron)  intron)   intron)
+                                    ┃ ┃
+                               Donor site
+                               (GT dinucleotide)
+```
+
+### Acceptor Site Region (3' end of intron)
+
+```
+                     INTRON                            EXON (CDS)
+              ...━━━━━━━━━━━━━━━━━━━━┫ ┃━━━━━━━━━━━━━━━━━━━━━━...
+                                    ┃ ┃
+     c.456-3   c.456-2   c.456-1    ┃ ┃ c.456
+      (3bp      (2bp      (1bp      ┃ ┃  (first CDS
+      before    before    before    ┃ ┃   base of
+      exon)     exon)     exon)     ┃ ┃   this exon)
+                                    ┃ ┃
+                               Acceptor site
+                               (AG dinucleotide)
+```
+
+---
+
+## Complete Real-World Example
+
+```
+Gene: CFTR (Cystic Fibrosis Transmembrane Conductance Regulator)
+Transcript: NM_000492.4
+
+Genomic location: chr7:117,480,025-117,668,665 (188 kb span)
+CDS length: c.1 to c.4443 (1480 amino acids × 3 = 4440, plus stop)
+Structure: 27 exons
+
+Example variant: NM_000492.4:c.1521+1G>A
+
+Breakdown:
+├── NM_000492.4  → CFTR transcript (RefSeq accession)
+├── c.1521       → CDS position 1521 (this falls in exon 10)
+├── +1           → 1bp INTO the intron (after exon 10 ends)
+├── G>A          → Reference G changed to alternate A
+└── Effect       → Disrupts donor splice site of exon 10
+                   (destroys the canonical GT → AT)
+```
+
+---
+
+## Converting Between Coordinate Systems
+
+### c. (CDS) → Genomic Coordinate
+
+This requires:
+1. **Transcript ID** (tells you which gene/isoform)
+2. **Genome build** (GRCh37 vs GRCh38 have different coordinates)
+3. **Transcript annotation** (exon coordinates from GTF/GFF)
 
 ```python
-# Donor site region (5' end of intron, positive offsets)
-c.123+1G>A   # 1bp into intron after exon position 123
-c.123+2T>C   # 2bp into intron
-c.123+10G>A  # 10bp into intron (extended splice region)
+# Python example using biocommons.hgvs library
+from hgvs.parser import Parser
+from hgvs.dataproviders.uta import connect
+from hgvs.mapper import AssemblyMapper
 
-# Acceptor site region (3' end of intron, negative offsets)
-c.456-1G>A   # 1bp before exon position 456
-c.456-2A>G   # 2bp before exon (canonical acceptor AG)
-c.456-25T>C  # 25bp before exon (polypyrimidine tract)
+# Connect to UTA (Universal Transcript Archive)
+hdp = connect()
+am = AssemblyMapper(hdp, assembly_name="GRCh38")
+
+# Parse HGVS
+hp = Parser()
+var_c = hp.parse("NM_000492.4:c.1521+1G>A")
+
+# Map to genomic coordinates
+var_g = am.c_to_g(var_c)
+print(var_g)  # NC_000007.14:g.117559590C>T
 ```
+
+### Quick Reference Table
+
+| Notation | What It Means | Coordinate System |
+|----------|---------------|-------------------|
+| `c.123` | CDS position 123 | Transcript-relative, coding only |
+| `c.123+5` | 5bp into intron after CDS pos 123 | Transcript-relative, intronic |
+| `c.123-5` | 5bp before exon containing CDS pos 123 | Transcript-relative, intronic |
+| `c.-10` | 10bp into 5'UTR (before ATG) | Transcript-relative, non-coding |
+| `c.*10` | 10bp into 3'UTR (after STOP) | Transcript-relative, non-coding |
+| `g.12345678` | Genomic position 12345678 | Chromosome-absolute |
 
 ---
 
