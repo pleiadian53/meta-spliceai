@@ -23,13 +23,15 @@ from .splicevardb_loader import (
 )
 from .position_labels import (
     AffectedPosition,
-    PositionLabelResult,
     derive_position_labels_from_delta,
-    derive_position_labels_from_hgvs,
-    derive_position_labels,
+    derive_position_labels_per_channel,
     create_position_attention_target,
     create_binary_position_mask,
-    analyze_position_label_distribution
+    create_offset_target,
+    derive_position_from_hgvs,
+    effect_type_to_channel,
+    channel_to_effect_type,
+    summarize_affected_positions
 )
 
 __all__ = [
@@ -45,12 +47,14 @@ __all__ = [
     "parse_hgvs_position_hint",
     # Position labels (Multi-Step Step 3)
     "AffectedPosition",
-    "PositionLabelResult",
     "derive_position_labels_from_delta",
-    "derive_position_labels_from_hgvs",
-    "derive_position_labels",
+    "derive_position_labels_per_channel",
     "create_position_attention_target",
     "create_binary_position_mask",
-    "analyze_position_label_distribution",
+    "create_offset_target",
+    "derive_position_from_hgvs",
+    "effect_type_to_channel",
+    "channel_to_effect_type",
+    "summarize_affected_positions",
 ]
 
