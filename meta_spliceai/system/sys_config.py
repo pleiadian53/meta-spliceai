@@ -8,7 +8,14 @@ import re
 import configparser
 from configparser import ConfigParser
 import threading
-import pyspark
+
+# PySpark is optional - only needed for Fabric/Lakehouse environments
+try:
+    import pyspark
+    PYSPARK_AVAILABLE = True
+except ImportError:
+    pyspark = None
+    PYSPARK_AVAILABLE = False
 
 from . import lakehouse_config
 from .lakehouse_config import (

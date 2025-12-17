@@ -1,6 +1,13 @@
 import pandas as pd
 import polars as pl
-from pyspark.sql import DataFrame as SparkDataFrame
+
+# PySpark is optional - only needed for Spark-based workflows
+try:
+    from pyspark.sql import DataFrame as SparkDataFrame
+    PYSPARK_AVAILABLE = True
+except ImportError:
+    SparkDataFrame = None  # Will be None if pyspark not installed
+    PYSPARK_AVAILABLE = False
 
 from .utils_doc import (
     print_emphasized, 
@@ -102,7 +109,7 @@ def drop_columns(df, columns):
         return df.drop(columns=columns)
     elif isinstance(df, pl.DataFrame):
         return df.drop(columns)
-    elif isinstance(df, SparkDataFrame):
+    elif PYSPARK_AVAILABLE and isinstance(df, SparkDataFrame):
         return df.drop(*columns)
     else:
         raise ValueError("Unsupported DataFrame type")
@@ -176,7 +183,7 @@ def join_and_remove_duplicates(df1, df2, on, how: str = "inner", verbose: int = 
     # ------------------------------------------------------------------
     # Spark fallback (unchanged) ---------------------------------------
     # ------------------------------------------------------------------
-    if isinstance(df1, SparkDataFrame):
+    if PYSPARK_AVAILABLE and isinstance(df1, SparkDataFrame):
         # Convert both to pandas – spark joins are heavyweight in driver
         df1_pd = df1.toPandas()
         df2_pd = df2.toPandas() if isinstance(df2, SparkDataFrame) else (
@@ -189,7 +196,9 @@ def join_and_remove_duplicates(df1, df2, on, how: str = "inner", verbose: int = 
         if verbose > 0:
             incorporated = [c for c in df2_pd.columns if c not in on and c in combined_pd.columns]
             print(f"[info] Columns from df2 incorporated into df1: {incorporated}")
-        return SparkDataFrame.from_pandas(combined_pd)
+        from pyspark.sql import SparkSession
+        spark = SparkSession.builder.getOrCreate()
+        return spark.createDataFrame(combined_pd)
 
     raise TypeError("Unsupported DataFrame type for df1")
 
@@ -212,7 +221,7 @@ def is_dataframe_empty(df):
         return df.empty
     elif isinstance(df, pl.DataFrame):
         return df.is_empty()
-    elif isinstance(df, SparkDataFrame):
+    elif PYSPARK_AVAILABLE and isinstance(df, SparkDataFrame):
         return df.rdd.isEmpty()
     else:
         raise ValueError("Unsupported DataFrame type")
