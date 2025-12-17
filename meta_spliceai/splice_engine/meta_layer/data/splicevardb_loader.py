@@ -32,16 +32,16 @@ def _find_splicevardb_path() -> Path:
     Path
         Path to the SpliceVarDB TSV file
     """
-    # Get project root (parent of meta_spliceai package)
-    package_root = Path(__file__).parent.parent.parent  # meta_spliceai/splice_engine
-    project_root = package_root.parent.parent  # meta-spliceai/
+    from meta_spliceai.system.config import find_project_root
+    
+    project_root = Path(find_project_root(str(Path(__file__))))
     
     # Search locations in priority order
     search_paths = [
         # Standard data directory (recommended)
         project_root / "data" / "splicevardb" / "splicevardb.download.tsv",
         # Legacy package location (backwards compatibility)
-        package_root / "case_studies" / "workflows" / "splicevardb" / "splicevardb.download.tsv",
+        project_root / "meta_spliceai" / "splice_engine" / "case_studies" / "workflows" / "splicevardb" / "splicevardb.download.tsv",
         # RunPods workspace location
         Path("/workspace/meta-spliceai/data/splicevardb/splicevardb.download.tsv"),
     ]
