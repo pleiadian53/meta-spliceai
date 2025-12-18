@@ -106,9 +106,9 @@ Before moving to `src/`, we need:
 | Phase | Status | Target |
 |-------|--------|--------|
 | Validated Delta Prediction | ✅ Working (r=0.61) | Done |
-| Position Localization | 🔄 In Progress | Q1 2025 |
-| Aberrant Site Annotations | 📋 Planned | Q1-Q2 2025 |
-| Production Refactor | ⏳ Future | Q2-Q3 2025 |
+| Position Localization | 🔄 In Progress | Q1 2026 |
+| Aberrant Site Annotations | 📋 Planned | Q1-Q2 2026 |
+| Production Refactor | ⏳ Future | Q2-Q3 2026 |
 
 ---
 

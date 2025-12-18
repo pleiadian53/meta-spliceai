@@ -8,6 +8,7 @@ by the meta-layer.
 | Document | Description |
 |----------|-------------|
 | [SPLICEVARDB.md](SPLICEVARDB.md) | SpliceVarDB dataset and label derivation |
+| [MUTSPLICEDB.md](MUTSPLICEDB.md) | MutSpliceDB: RNA-seq validated splice effects |
 | [HGVS_TUTORIAL.md](HGVS_TUTORIAL.md) | HGVS notation tutorial (CDS, exons, coordinate systems) |
 
 ## Future Directions

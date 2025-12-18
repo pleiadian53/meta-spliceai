@@ -772,7 +772,7 @@ If you use Meta-SpliceAI in your research, please cite:
 
 ---
 
-**Meta-SpliceAI** - Advancing splice site prediction through meta-learning
+**Meta-SpliceAI** - Advancing splice site prediction and isoform discovery through meta-learning
 
 *Version 0.4.0 | Last Updated: December 2025*
 
