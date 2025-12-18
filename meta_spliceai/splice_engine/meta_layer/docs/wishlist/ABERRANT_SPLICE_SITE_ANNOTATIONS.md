@@ -16,10 +16,15 @@ Current training approaches have a fundamental limitation:
 ```
 Current: Variant → Base Model → Delta Score → Train Meta Model
                       ↑
-              Circular dependency: Meta model learns what base model predicts
+              Label quality issue: Meta model learns BASE MODEL BEHAVIOR, not ground truth
 ```
 
-We lack **ground truth aberrant splice site positions** - the precise genomic coordinates where variants induce cryptic/alternative splice sites.
+The meta model learns to predict what the **base model thinks** about splicing effects, 
+not the **actual biological splicing outcome**. If the base model is wrong about a variant's 
+effect location or magnitude, the meta model learns those errors.
+
+We lack **ground truth aberrant splice site positions** - the precise genomic coordinates 
+where variants induce cryptic/alternative splice sites.
 
 ### The Solution
 
