@@ -8,9 +8,10 @@ precise genomic coordinates for variant-induced aberrant splice sites.
 Usage
 -----
 python parse_mutsplicedb.py \
-    --input data/mutsplicedb/mutsplicedb_export.csv \
+    --input data/mutsplicedb/MutSpliceDB_BRP_2025-12-18.csv \
     --output data/mutsplicedb/splice_sites_induced.tsv \
-    --gtf data/mane/GRCh38/MANE.GRCh38.v1.3.ensembl_genomic.gtf
+    --gtf data/mane/GRCh38/MANE.GRCh38.v1.3.refseq_genomic.gtf \
+    --genome-version hg38  # Filter for OpenSpliceAI compatibility
 
 Input
 -----
@@ -40,6 +41,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
+
+# Optional: liftover support
+try:
+    from pyliftover import LiftOver
+    LIFTOVER_AVAILABLE = True
+except ImportError:
+    LIFTOVER_AVAILABLE = False
 
 # Setup logging
 logging.basicConfig(
@@ -85,11 +93,12 @@ class InducedSpliceSite:
 @dataclass
 class ParsedEffect:
     """Parsed splicing effect from MutSpliceDB description."""
-    effect_type: str
+    effect_type: str = ""
     affected_exons: List[int] = field(default_factory=list)
     affected_introns: List[int] = field(default_factory=list)
     cryptic_position: Optional[int] = None
     raw_description: str = ""
+    notes: str = ""  # e.g., "potential" for uncertain effects
 
 
 # =============================================================================
@@ -194,13 +203,30 @@ def parse_splicing_effect(effect_description: str) -> ParsedEffect:
     
     Examples
     --------
+    "Intron inclusion between exons 15 & 16" → ParsedEffect(effect_type='intron_retention', affected_introns=[15])
     "Exon 4 skipping" → ParsedEffect(effect_type='exon_skipping', affected_exons=[4])
-    "Exon 3-4 skipping" → ParsedEffect(effect_type='exon_skipping', affected_exons=[3, 4])
-    "Intron 5 retention" → ParsedEffect(effect_type='intron_retention', affected_introns=[5])
-    "Cryptic donor activation" → ParsedEffect(effect_type='cryptic_activation')
+    "Exon 10 skipping, or intron inclusion" → ParsedEffect(effect_type='mixed')
+    "Potential intron inclusion between exons 9 & 10" → ParsedEffect(effect_type='intron_retention', confidence='potential')
     """
     effect = ParsedEffect(raw_description=effect_description)
     desc_lower = effect_description.lower()
+    
+    # MutSpliceDB primary format: "Intron inclusion between exons X & Y"
+    # This means intron X (between exon X and exon X+1) is retained
+    intron_inclusion_pattern = r'intron\s+inclusion\s+between\s+exons?\s+(\d+)\s*[&,]\s*(\d+)'
+    match = re.search(intron_inclusion_pattern, desc_lower)
+    if match:
+        exon1 = int(match.group(1))
+        exon2 = int(match.group(2))
+        # Intron number = exon before it
+        effect.effect_type = 'intron_retention'
+        effect.affected_introns.append(exon1)  # Intron between exon1 and exon2
+        
+        # Check if this is "potential" (uncertain)
+        if 'potential' in desc_lower:
+            effect.notes = 'potential'
+        
+        return effect
     
     # Exon skipping patterns
     exon_skip_patterns = [
@@ -208,6 +234,7 @@ def parse_splicing_effect(effect_description: str) -> ParsedEffect:
         r'skip(?:ping|s)?\s+(?:of\s+)?exon\s+(\d+)',
         r'exon\s+(\d+)\s*[-–]\s*(\d+)\s+skip',
         r'exons?\s+(\d+)\s+and\s+(\d+)\s+skip',
+        r'exon\s+(\d+)\s+skipping',
     ]
     
     for pattern in exon_skip_patterns:
@@ -220,7 +247,16 @@ def parse_splicing_effect(effect_description: str) -> ParsedEffect:
                     effect.affected_exons.append(int(g))
             return effect
     
-    # Intron retention patterns
+    # Mixed effect: "exon X skipping, or intron inclusion"
+    if 'or' in desc_lower and ('skip' in desc_lower or 'intron' in desc_lower):
+        effect.effect_type = 'mixed'
+        # Try to extract exon numbers
+        exon_match = re.search(r'exon\s+(\d+)', desc_lower)
+        if exon_match:
+            effect.affected_exons.append(int(exon_match.group(1)))
+        return effect
+    
+    # Legacy intron retention patterns
     intron_patterns = [
         r'intron\s+(\d+)\s+retention',
         r'retention\s+(?:of\s+)?intron\s+(\d+)',
@@ -412,6 +448,22 @@ def derive_sites_from_intron_retention(
 # MAIN PROCESSING
 # =============================================================================
 
+def parse_locus(locus: str) -> Optional[Tuple[str, int, int]]:
+    """
+    Parse the Locus column from MutSpliceDB.
+    
+    Format: "chr13:95166057-95166257"
+    Returns: (chrom, start, end) or None
+    """
+    if not locus or pd.isna(locus):
+        return None
+    
+    match = re.match(r'(chr[\dXYM]+):(\d+)-(\d+)', str(locus))
+    if match:
+        return (match.group(1), int(match.group(2)), int(match.group(3)))
+    return None
+
+
 def process_mutsplicedb_entry(
     row: pd.Series,
     exons_by_transcript: Dict[str, List[ExonInfo]],
@@ -422,15 +474,20 @@ def process_mutsplicedb_entry(
     """
     sites = []
     
-    # Extract fields (adjust column names based on actual export)
-    gene = row.get('Gene Symbol', row.get('gene_symbol', ''))
-    hgvs = row.get('HGVS Notation', row.get('hgvs', ''))
-    effect_desc = row.get('Splicing Effect', row.get('splicing_effect', ''))
-    sample = row.get('Sample Name', row.get('sample', ''))
-    source = row.get('Sample Source', row.get('source', 'MutSpliceDB'))
+    # Extract fields based on actual MutSpliceDB column names
+    gene = row.get('Gene Symbol', '')
+    hgvs = row.get('Mutation', '')  # Column is "Mutation" not "HGVS Notation"
+    effect_desc = row.get('Splicing effect', '')  # Note lowercase 'e'
+    sample = row.get('Sample', '')
+    source = row.get('Source', 'MutSpliceDB')
+    genome_version = row.get('Genome version', 'hg38')
+    locus = row.get('Locus', '')
     
     if not effect_desc:
         return sites
+    
+    # Parse the locus to get coordinates directly
+    locus_parsed = parse_locus(locus)
     
     # Parse effect description
     parsed_effect = parse_splicing_effect(effect_desc)
@@ -469,27 +526,58 @@ def process_mutsplicedb_entry(
                 exons = tx_exons
                 break
     
-    if not exons:
-        logger.debug(f"Could not find exons for {gene} / {transcript_id}")
-        return sites
+    # APPROACH 1: Use GTF exon coordinates if available
+    if exons:
+        if parsed_effect.effect_type == 'exon_skipping' and parsed_effect.affected_exons:
+            sites = derive_junction_from_exon_skipping(exons, parsed_effect.affected_exons)
+        
+        elif parsed_effect.effect_type == 'intron_retention' and parsed_effect.affected_introns:
+            sites = derive_sites_from_intron_retention(exons, parsed_effect.affected_introns)
+        
+        elif parsed_effect.effect_type in ['cryptic_donor', 'cryptic_acceptor', 'cryptic_activation']:
+            logger.info(f"Cryptic site detected but position unknown: {gene} - {effect_desc}")
     
-    # Derive sites based on effect type
-    if parsed_effect.effect_type == 'exon_skipping' and parsed_effect.affected_exons:
-        sites = derive_junction_from_exon_skipping(exons, parsed_effect.affected_exons)
+    # APPROACH 2: If no GTF match but we have locus, use that as approximate position
+    elif locus_parsed and not sites:
+        chrom, locus_start, locus_end = locus_parsed
+        center_pos = (locus_start + locus_end) // 2
+        
+        # Create a site record with the locus information
+        # The locus is typically a ±100bp window around the variant
+        site_type = 'unknown'
+        if parsed_effect.effect_type == 'intron_retention':
+            site_type = 'intron_retention_region'
+        elif parsed_effect.effect_type == 'exon_skipping':
+            site_type = 'exon_skipping_region'
+        
+        # Determine strand (default to + if unknown)
+        strand = '+'
+        
+        sites.append(InducedSpliceSite(
+            chrom=chrom,
+            position=center_pos,
+            strand=strand,
+            site_type=site_type,
+            inducing_variant=hgvs,
+            effect_type=parsed_effect.effect_type,
+            gene=gene,
+            transcript_id=transcript_id or '',
+            evidence_source=source,
+            evidence_samples=sample,
+            confidence='medium',  # Lower confidence since from locus, not GTF
+            notes=f'From locus {locus}, genome {genome_version}'
+        ))
+    else:
+        logger.debug(f"Could not find exons or locus for {gene} / {transcript_id}")
     
-    elif parsed_effect.effect_type == 'intron_retention' and parsed_effect.affected_introns:
-        sites = derive_sites_from_intron_retention(exons, parsed_effect.affected_introns)
-    
-    elif parsed_effect.effect_type in ['cryptic_donor', 'cryptic_acceptor', 'cryptic_activation']:
-        # For cryptic sites, we may not have exact positions without more analysis
-        # Mark these for manual review or further processing
-        logger.info(f"Cryptic site detected but position unknown: {gene} - {effect_desc}")
-    
-    # Fill in common fields
+    # Fill in common fields for GTF-derived sites
     for site in sites:
-        site.inducing_variant = hgvs
-        site.evidence_source = source
-        site.evidence_samples = sample
+        if not site.inducing_variant:
+            site.inducing_variant = hgvs
+        if not site.evidence_source:
+            site.evidence_source = source
+        if not site.evidence_samples:
+            site.evidence_samples = sample
     
     return sites
 
@@ -521,6 +609,17 @@ def main():
         '--verbose', '-v',
         action='store_true',
         help='Enable verbose logging'
+    )
+    parser.add_argument(
+        '--genome-version', '-gv',
+        default='hg38',
+        choices=['hg38', 'hg19', 'all'],
+        help='Filter by genome version for base model compatibility (default: hg38 for OpenSpliceAI)'
+    )
+    parser.add_argument(
+        '--liftover',
+        action='store_true',
+        help='Convert hg19 coordinates to hg38 (requires pyliftover: pip install pyliftover)'
     )
     
     args = parser.parse_args()
@@ -564,6 +663,36 @@ def main():
     logger.info(f"Loaded {len(df)} entries")
     logger.info(f"Columns: {list(df.columns)}")
     
+    # Filter by genome version for base model compatibility
+    genome_col = 'Genome version'
+    if genome_col in df.columns:
+        version_counts = df[genome_col].value_counts()
+        logger.info(f"Genome version distribution:\n{version_counts}")
+        
+        # With --liftover, include both hg38 and hg19 (hg19 will be converted)
+        if args.liftover:
+            original_count = len(df)
+            df = df[df[genome_col].isin(['hg38', 'hg19'])]
+            logger.info(f"Including hg38 + hg19 for liftover: {len(df)}/{original_count} entries")
+        elif args.genome_version != 'all':
+            original_count = len(df)
+            df = df[df[genome_col] == args.genome_version]
+            logger.info(f"Filtered to {args.genome_version}: {len(df)}/{original_count} entries")
+    else:
+        logger.warning(f"Column '{genome_col}' not found, skipping genome version filter")
+    
+    # Setup liftover if requested
+    liftover = None
+    if args.liftover:
+        if not LIFTOVER_AVAILABLE:
+            logger.error("pyliftover not installed. Run: pip install pyliftover")
+            sys.exit(1)
+        logger.info("Initializing hg19 → hg38 liftover...")
+        liftover = LiftOver('hg19', 'hg38')
+        # Include all entries when doing liftover
+        if args.genome_version == 'hg38':
+            logger.info("With --liftover, processing ALL entries (hg19 will be converted)")
+    
     # Process each entry
     all_sites = []
     success_count = 0
@@ -579,6 +708,36 @@ def main():
     
     logger.info(f"Successfully processed {success_count}/{len(df)} entries")
     logger.info(f"Extracted {len(all_sites)} induced splice sites")
+    
+    # Apply liftover for hg19 sites if requested
+    if liftover and all_sites:
+        converted_count = 0
+        failed_count = 0
+        
+        for site in all_sites:
+            # Check if this site came from hg19 (stored in notes)
+            if 'genome hg19' in site.notes:
+                # Extract chromosome (handle 'chr' prefix)
+                chrom = site.chrom
+                if not chrom.startswith('chr'):
+                    chrom = 'chr' + chrom
+                
+                # Convert coordinate
+                result = liftover.convert_coordinate(chrom, site.position)
+                
+                if result and len(result) > 0:
+                    new_chrom, new_pos, new_strand, _ = result[0]
+                    site.chrom = new_chrom
+                    site.position = new_pos
+                    site.notes = site.notes.replace('genome hg19', 'genome hg19→hg38 (lifted)')
+                    converted_count += 1
+                else:
+                    # Mark as failed liftover
+                    site.notes += ' [LIFTOVER_FAILED]'
+                    site.confidence = 'low'
+                    failed_count += 1
+        
+        logger.info(f"Liftover: {converted_count} converted, {failed_count} failed")
     
     # Convert to DataFrame and save
     if all_sites:

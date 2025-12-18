@@ -52,10 +52,41 @@ After downloading, run:
 
 ```bash
 python scripts/data_processing/parse_mutsplicedb.py \
-    --input data/mutsplicedb/mutsplicedb_export.csv \
+    --input data/mutsplicedb/MutSpliceDB_BRP_2025-12-18.csv \
     --output data/mutsplicedb/splice_sites_induced.tsv \
-    --gtf data/mane/GRCh38/MANE.GRCh38.v1.3.ensembl_genomic.gtf
+    --gtf data/mane/GRCh38/MANE.GRCh38.v1.3.refseq_genomic.gtf \
+    --genome-version hg38 \
+    --verbose
 ```
+
+### Genome Version Filtering
+
+⚠️ **Important**: MutSpliceDB contains data from both hg38 (~80%) and hg19 (~20%).
+OpenSpliceAI and other modern base models use **hg38/GRCh38**.
+
+| Option | Description |
+|--------|-------------|
+| `--genome-version hg38` | **Default** - Use only hg38 entries |
+| `--genome-version hg19` | Use only hg19 entries |
+| `--genome-version all` | Use all entries (may have coordinate mismatches) |
+| `--liftover` | **Recommended** - Include hg19 entries and convert to hg38 |
+
+### Using Liftover to Maximize Data
+
+To include all entries (hg38 + hg19 converted to hg38):
+
+```bash
+pip install pyliftover  # One-time setup
+
+python scripts/data_processing/parse_mutsplicedb.py \
+    --input data/mutsplicedb/MutSpliceDB_BRP_2025-12-18.csv \
+    --output data/mutsplicedb/splice_sites_induced.tsv \
+    --gtf data/mane/GRCh38/MANE.GRCh38.v1.3.refseq_genomic.gtf \
+    --liftover \
+    --verbose
+```
+
+This gives ~446 entries instead of ~368 (hg38 only).
 
 ### What the Parser Does
 

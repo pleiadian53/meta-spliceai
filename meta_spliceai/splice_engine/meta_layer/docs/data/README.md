@@ -10,6 +10,7 @@ by the meta-layer.
 | [SPLICEVARDB.md](SPLICEVARDB.md) | SpliceVarDB dataset and label derivation |
 | [MUTSPLICEDB.md](MUTSPLICEDB.md) | MutSpliceDB: RNA-seq validated splice effects |
 | [HGVS_TUTORIAL.md](HGVS_TUTORIAL.md) | HGVS notation tutorial (CDS, exons, coordinate systems) |
+| [LIFTOVER_TUTORIAL.md](LIFTOVER_TUTORIAL.md) | Converting coordinates between genome builds (hg19↔hg38) |
 
 ## Future Directions
 
