@@ -198,6 +198,13 @@ docs/.doctrees/
 dev/
 dev/*
 
+# RunPods configuration (user-specific, NOT for public)
+# Contains local paths, SSH configs, and personal workflow
+runpods/
+runpods/**/*
+!runpods.example/
+!runpods.example/**/*
+
 # Experimental outputs and results (large files)
 # Use leading slash to only match root-level directories
 # (not package directories like meta_spliceai/.../models/)

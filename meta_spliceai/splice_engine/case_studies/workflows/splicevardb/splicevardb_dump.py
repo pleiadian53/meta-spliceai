@@ -3,6 +3,11 @@ import os, sys, time, json, math, argparse
 import requests
 from typing import Dict, Any, List, Tuple, Optional
 
+
+# This script paginates through the variants endpoint and 
+# writes newline-delimited JSON plus a single TSV and an optional VCF.
+
+
 # ---- config defaults (adjust if their API field names differ) ----
 DEFAULT_BASE = "https://compbio.ccia.org.au/splicevardb-api"  # per paper
 VAR_ENDPOINT = "/variants"  # guessed from typical REST; adjust if docs differ

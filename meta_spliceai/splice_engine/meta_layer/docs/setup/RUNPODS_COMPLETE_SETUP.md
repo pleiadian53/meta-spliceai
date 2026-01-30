@@ -84,10 +84,38 @@ ssh-keygen -t rsa -b 4096 -C "your_email@example.com" -f ~/.ssh/id_rsa
 
 ### Step 3: Configure SSH Config (Local Machine)
 
+**Option A: Using RunPods SSH Manager (Recommended)**
+
+We've created a utility to simplify SSH config management:
+
+```bash
+# Navigate to meta-spliceai
+cd ~/work/meta-spliceai
+
+# Run the SSH manager
+./scripts/setup/runpod_ssh_manager.sh add meta-spliceai
+
+# Follow the prompts:
+#   Hostname: <from RunPods dashboard>
+#   Port: <from RunPods dashboard>
+#   Nickname: a40-100gb (or your GPU/disk size)
+#   SSH Key: ~/.ssh/id_ed25519
+```
+
+This will:
+- Automatically create a properly formatted SSH config entry
+- Backup your existing config
+- Test the connection
+- Track pod history
+
+**See**: [RUNPOD_SSH_MANAGER_GUIDE.md](../../../../scripts/setup/RUNPOD_SSH_MANAGER_GUIDE.md) for full documentation.
+
+**Option B: Manual Configuration**
+
 Add to `~/.ssh/config`:
 
 ```ssh
-Host runpod-metaspliceai
+Host runpod-metaspliceai-a40
     # ⚠️ UPDATE THESE from RunPods dashboard "SSH over exposed TCP"
     HostName <IP_ADDRESS>
     Port <PORT>
@@ -97,11 +125,17 @@ Host runpod-metaspliceai
     UserKnownHostsFile /dev/null
     ServerAliveInterval 60
     ServerAliveCountMax 5
+    ConnectTimeout 10
+    Compression yes
 ```
 
 ### Step 4: Test Connection
 
 ```bash
+# Using SSH manager naming
+ssh runpod-metaspliceai-a40-100gb
+
+# Or your manual alias
 ssh runpod-metaspliceai
 # Should connect without password prompt
 ```
