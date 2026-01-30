@@ -1090,7 +1090,7 @@ def run_binary_classifier_experiment(config: ExperimentConfig, device: str = 'cu
     logger.info(f"RESULTS: {config.name}")
     logger.info("=" * 60)
     logger.info(f"ROC-AUC: {roc_auc:.4f}")
-    logger.info(f"PR-AUC: {pr_auc:.4f}")
+    logger.info(f"AP (Average Precision): {pr_auc:.4f}")
     logger.info(f"F1 Score: {f1:.4f} (threshold={best_threshold:.3f})")
     logger.info(f"Time elapsed: {elapsed/60:.1f} minutes")
     
@@ -1562,7 +1562,7 @@ def run_hyenadna_binary_experiment(config: ExperimentConfig, device: str = 'cuda
     logger.info(f"RESULTS: {config.name}")
     logger.info("=" * 60)
     logger.info(f"ROC-AUC: {roc_auc:.4f}")
-    logger.info(f"PR-AUC: {pr_auc:.4f}")
+    logger.info(f"AP (Average Precision): {pr_auc:.4f}")
     logger.info(f"F1 Score: {f1:.4f} (threshold={best_threshold:.3f})")
     logger.info(f"Time elapsed: {elapsed/60:.1f} minutes")
     
