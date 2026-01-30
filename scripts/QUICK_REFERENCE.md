@@ -5,7 +5,7 @@
 ### **After Gene CV Training** (Most Frequent)
 ```bash
 # Analyze F1-based PR curves and FP/FN trade-offs
-python scripts/f1_pr_analysis_merged.py results/gene_cv_pc_1000_3mers_run_4
+python scripts/analysis/f1_pr_analysis_merged.py results/gene_cv_pc_1000_3mers_run_4
 
 # Expected output:
 # - pr_curves_f1_optimized.pdf
@@ -15,34 +15,34 @@ python scripts/f1_pr_analysis_merged.py results/gene_cv_pc_1000_3mers_run_4
 ### **Before Training** (Pre-flight Checks)
 ```bash
 # Comprehensive system validation
-python scripts/pre_flight_checks.py
+python scripts/validation/pre_flight_checks.py
 
 # Data validation
-python scripts/validate_meta_model_training_data.py
+python scripts/validation/validate_meta_model_training_data.py
 ```
 
 ### **GPU Issues** (Troubleshooting)
 ```bash
 # Quick GPU check
-python scripts/check_gpu.py
+python scripts/testing/check_gpu.py
 
 # Comprehensive GPU diagnostics
-python scripts/diagnose_gpu_environment.py
+python scripts/installation/diagnose_gpu_environment.py
 
 # Performance testing
-python scripts/test_gpu_performance.py
+python scripts/testing/test_gpu_performance.py
 ```
 
 ### **Data Exploration** (Understanding Your Data)
 ```bash
 # Comprehensive training data analysis
-python scripts/analyze_training_data.py
+python scripts/analysis/analyze_training_data.py
 
 # Inspect specific sequences
-python scripts/inspect_analysis_sequences.py
+python scripts/analysis/inspect_analysis_sequences.py
 
 # Check dataset integrity
-python scripts/test_dataset_integrity.py
+python scripts/testing/test_dataset_integrity.py
 ```
 
 ## 📁 **Quick Directory Navigation**
@@ -50,108 +50,109 @@ python scripts/test_dataset_integrity.py
 ```
 scripts/
 ├── 🔧 Setup & Troubleshooting
-│   ├── check_gpu.py                    # Quick GPU check
-│   ├── diagnose_gpu_environment.py     # Full GPU diagnostics
-│   ├── pre_flight_checks.py            # Pre-training validation
-│   └── fix_ml_dependencies.py          # Fix library issues
+│   ├── testing/check_gpu.py                      # Quick GPU check
+│   ├── installation/diagnose_gpu_environment.py  # Full GPU diagnostics
+│   ├── validation/pre_flight_checks.py           # Pre-training validation
+│   └── installation/fix_ml_dependencies.py       # Fix library issues
 │
 ├── 📊 Data & Analysis
-│   ├── analyze_training_data.py         # Training data analysis
-│   ├── validate_meta_model_training_data.py  # Data validation
-│   ├── inspect_analysis_sequences.py    # Sequence inspection
-│   └── f1_pr_analysis_merged.py        # 🌟 CV results analysis
+│   ├── analysis/analyze_training_data.py                # Training data analysis
+│   ├── validation/validate_meta_model_training_data.py  # Data validation
+│   ├── analysis/inspect_analysis_sequences.py           # Sequence inspection
+│   └── analysis/f1_pr_analysis_merged.py                # 🌟 CV results analysis
 │
 ├── 🎯 Model Training & Evaluation
-│   ├── run_multi_gpu_training.py        # Multi-GPU training
-│   ├── test_transcript_topk.py          # Transcript evaluation
-│   └── evaluation/                      # Evaluation scripts
+│   ├── training/run_multi_gpu_training.py       # Multi-GPU training
+│   ├── testing/test_transcript_topk.py          # Transcript evaluation
+│   └── evaluation/                              # Evaluation scripts
 │
 └── 🛠️ Utilities
-    ├── cleanup_artifacts.py             # Clean old files
-    ├── validate_artifacts.py            # Validate outputs
-    └── scaling_solutions/               # Large-scale solutions
+    ├── maintenance/cleanup_artifacts.py         # Clean old files
+    ├── validation/validate_artifacts.py         # Validate outputs
+    ├── utilities/                               # Helper tools
+    └── scaling_solutions/                       # Large-scale solutions
 ```
 
 ## 🎯 **Problem-Solution Quick Lookup**
 
 | Problem | Script | Command |
 |---------|--------|---------|
-| **CV results need analysis** | `f1_pr_analysis_merged.py` | `python scripts/f1_pr_analysis_merged.py results/gene_cv_*` |
-| **GPU not detected** | `diagnose_gpu_environment.py` | `python scripts/diagnose_gpu_environment.py` |
-| **Training data looks wrong** | `analyze_training_data.py` | `python scripts/analyze_training_data.py` |
-| **Pre-training validation** | `pre_flight_checks.py` | `python scripts/pre_flight_checks.py` |
-| **Library conflicts** | `fix_ml_dependencies.py` | `python scripts/fix_ml_dependencies.py` |
-| **Dataset integrity issues** | `test_dataset_integrity.py` | `python scripts/test_dataset_integrity.py` |
-| **Performance issues** | `test_gpu_performance.py` | `python scripts/test_gpu_performance.py` |
-| **Disk space issues** | `cleanup_artifacts.py` | `python scripts/cleanup_artifacts.py` |
+| **CV results need analysis** | `analysis/f1_pr_analysis_merged.py` | `python scripts/analysis/f1_pr_analysis_merged.py results/gene_cv_*` |
+| **GPU not detected** | `installation/diagnose_gpu_environment.py` | `python scripts/installation/diagnose_gpu_environment.py` |
+| **Training data looks wrong** | `analysis/analyze_training_data.py` | `python scripts/analysis/analyze_training_data.py` |
+| **Pre-training validation** | `validation/pre_flight_checks.py` | `python scripts/validation/pre_flight_checks.py` |
+| **Library conflicts** | `installation/fix_ml_dependencies.py` | `python scripts/installation/fix_ml_dependencies.py` |
+| **Dataset integrity issues** | `testing/test_dataset_integrity.py` | `python scripts/testing/test_dataset_integrity.py` |
+| **Performance issues** | `testing/test_gpu_performance.py` | `python scripts/testing/test_gpu_performance.py` |
+| **Disk space issues** | `maintenance/cleanup_artifacts.py` | `python scripts/maintenance/cleanup_artifacts.py` |
 
 ## 📋 **Workflow Checklists**
 
 ### **New Project Setup Checklist**
 - [ ] `./scripts/installation/migrate_conda_to_mamba.sh` (if needed)
-- [ ] `python scripts/check_gpu.py`
-- [ ] `python scripts/pre_flight_checks.py`
-- [ ] `python scripts/check_versions.py`
+- [ ] `python scripts/testing/check_gpu.py`
+- [ ] `python scripts/validation/pre_flight_checks.py`
+- [ ] `python scripts/testing/check_versions.py`
 
 ### **Before Training Checklist**
-- [ ] `python scripts/validate_meta_model_training_data.py`
-- [ ] `python scripts/test_dataset_integrity.py`
-- [ ] `python scripts/pre_flight_checks.py`
-- [ ] `python scripts/test_leakage_probe.py`
+- [ ] `python scripts/validation/validate_meta_model_training_data.py`
+- [ ] `python scripts/testing/test_dataset_integrity.py`
+- [ ] `python scripts/validation/pre_flight_checks.py`
+- [ ] `python scripts/testing/test_leakage_probe.py`
 
 ### **After Training Checklist**
-- [ ] `python scripts/f1_pr_analysis_merged.py results/gene_cv_*`
-- [ ] `python scripts/test_transcript_topk.py`
-- [ ] `python scripts/validate_artifacts.py`
+- [ ] `python scripts/analysis/f1_pr_analysis_merged.py results/gene_cv_*`
+- [ ] `python scripts/testing/test_transcript_topk.py`
+- [ ] `python scripts/validation/validate_artifacts.py`
 - [ ] Review generated plots and summaries
 
 ### **Troubleshooting Checklist**
-- [ ] `python scripts/diagnose_gpu_environment.py`
-- [ ] `python scripts/analyze_training_data.py`
-- [ ] `python scripts/test_datasets_loading.py`
-- [ ] `python scripts/fix_ml_dependencies.py`
+- [ ] `python scripts/installation/diagnose_gpu_environment.py`
+- [ ] `python scripts/analysis/analyze_training_data.py`
+- [ ] `python scripts/testing/test_datasets_loading.py`
+- [ ] `python scripts/installation/fix_ml_dependencies.py`
 
 ## 🔍 **Script Categories at a Glance**
 
 ### **🌟 High-Priority Scripts** (Use Weekly)
-- `f1_pr_analysis_merged.py` - CV results analysis
-- `pre_flight_checks.py` - System validation
-- `analyze_training_data.py` - Data exploration
-- `test_gpu_performance.py` - Performance monitoring
+- `analysis/f1_pr_analysis_merged.py` - CV results analysis
+- `validation/pre_flight_checks.py` - System validation
+- `analysis/analyze_training_data.py` - Data exploration
+- `testing/test_gpu_performance.py` - Performance monitoring
 
 ### **🔧 Setup Scripts** (Use Once/Rarely)
-- `diagnose_gpu_environment.py` - GPU troubleshooting
-- `fix_ml_dependencies.py` - Library fixes
-- `check_versions.py` - Compatibility checks
+- `installation/diagnose_gpu_environment.py` - GPU troubleshooting
+- `installation/fix_ml_dependencies.py` - Library fixes
+- `testing/check_versions.py` - Compatibility checks
 
 ### **📊 Analysis Scripts** (Use Per Project)
-- `validate_meta_model_training_data.py` - Data validation
-- `test_transcript_topk.py` - Model evaluation
-- `inspect_analysis_sequences.py` - Data inspection
+- `validation/validate_meta_model_training_data.py` - Data validation
+- `testing/test_transcript_topk.py` - Model evaluation
+- `analysis/inspect_analysis_sequences.py` - Data inspection
 
 ### **🛠️ Utility Scripts** (Use As Needed)
-- `cleanup_artifacts.py` - Maintenance
-- `validate_artifacts.py` - Output validation
-- `test_leakage_probe.py` - Quality control
+- `maintenance/cleanup_artifacts.py` - Maintenance
+- `validation/validate_artifacts.py` - Output validation
+- `testing/test_leakage_probe.py` - Quality control
 
 ## 💡 **Pro Tips**
 
 ### **Efficient Workflow**
-1. **Always start with**: `python scripts/pre_flight_checks.py`
-2. **After CV training**: `python scripts/f1_pr_analysis_merged.py results/gene_cv_*`
-3. **When in doubt**: `python scripts/analyze_training_data.py`
-4. **GPU issues**: `python scripts/diagnose_gpu_environment.py`
+1. **Always start with**: `python scripts/validation/pre_flight_checks.py`
+2. **After CV training**: `python scripts/analysis/f1_pr_analysis_merged.py results/gene_cv_*`
+3. **When in doubt**: `python scripts/analysis/analyze_training_data.py`
+4. **GPU issues**: `python scripts/installation/diagnose_gpu_environment.py`
 
 ### **Time-Saving Commands**
 ```bash
 # Quick system check
-python scripts/check_gpu.py && python scripts/check_versions.py
+python scripts/testing/check_gpu.py && python scripts/testing/check_versions.py
 
 # Full data validation pipeline
-python scripts/validate_meta_model_training_data.py && python scripts/test_dataset_integrity.py
+python scripts/validation/validate_meta_model_training_data.py && python scripts/testing/test_dataset_integrity.py
 
 # Post-training analysis suite
-python scripts/f1_pr_analysis_merged.py results/gene_cv_* && python scripts/test_transcript_topk.py
+python scripts/analysis/f1_pr_analysis_merged.py results/gene_cv_* && python scripts/testing/test_transcript_topk.py
 ```
 
 ### **Common Patterns**

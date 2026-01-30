@@ -34,8 +34,9 @@
 |-----------|---------|-------------|
 | **data/** | Data analysis & processing | Splice site analysis, gene patterns |
 | **data_management/** | Data acquisition | `download_clinvar.py` |
-| **data_processing/** | Data transformation | `parse_mutsplicedb.py` |
-| **analysis/** | Advanced analysis | Splice site visualization, quantification |
+| **data_processing/** | Data transformation | Gene manifest, sequence enhancement, validation |
+| **analysis/** | Advanced analysis | Splice site visualization, quantification, inspection |
+| **validation/** | Data validation | Artifact validation, training data validation |
 
 ### Environment & Setup
 
@@ -52,7 +53,8 @@
 | **monitoring/** | Training monitoring | `monitor_meta_training.sh`, universal monitor |
 | **builder/** | Incremental builder | `run_builder_resumable.sh` |
 | **scaling_solutions/** | Scalability tools | Memory optimization, performance monitoring |
-| **maintenance/** | Cleanup & maintenance | `cleanup_old_predictions.sh` |
+| **maintenance/** | Cleanup & maintenance | `cleanup_artifacts.py`, `cleanup_predictions.sh` |
+| **utilities/** | Helper tools | Diagram generation, script management |
 
 ### Infrastructure
 
@@ -67,7 +69,7 @@
 | Directory | Purpose | Contents |
 |-----------|---------|----------|
 | **docs/** | Documentation | Guides, monitoring docs |
-| **archive/** | Deprecated scripts | Old/superseded code |
+| **archive/** | Deprecated scripts | Rename scripts, old builders, temporary utilities |
 | **base_model/** | Base model tools | Download OpenSpliceAI models |
 | **inference/** | Inference scripts | Inference utilities |
 
@@ -108,10 +110,13 @@
 ./data/quick_splice_analysis.sh
 
 # Generate manifest
-./data/generate_splice_manifest.py
+./data_processing/generate_gene_manifest.py
 
 # Download data
 ./data_management/download_clinvar.py
+
+# Enhance splice sites
+./data_processing/enhance_splice_sites.py
 ```
 
 ### Environment Setup
@@ -124,7 +129,10 @@
 ./gpu_env_setup/verify_gpu_setup.py
 
 # Check versions
-./check_versions.py
+./testing/check_versions.py
+
+# Pre-flight checks
+./validation/pre_flight_checks.py
 ```
 
 ### RunPods (Centralized)
@@ -141,16 +149,20 @@ cd ../runpods
 
 | Category | Directories | Files |
 |----------|-------------|-------|
-| Testing | 1 | 85 |
-| Training | 1 | 15 |
+| Testing | 1 | ~95 (includes moved scripts) |
+| Training | 1 | ~18 (includes moved scripts) |
 | Scaling | 1 | 19 |
-| Analysis | 1 | 13 |
+| Analysis | 1 | ~21 (new category) |
 | Data | 3 | 14 |
+| Data Processing | 1 | 8 (new category) |
 | Evaluation | 1 | 11 |
 | GPU/Setup | 2 | 8 |
-| **Total** | **21** | **~200** |
+| Validation | 1 | 3 (new category) |
+| Utilities | 1 | 4 (new category) |
+| Archive | 1 | 6 (new category) |
+| **Total** | **23** | **~220** |
 
-**Additional**: ~63 loose files at root level
+**Root level**: Only 6 documentation files (README, QUICK_REFERENCE, etc.)
 
 ---
 
@@ -161,7 +173,7 @@ cd ../runpods
 **Train Models**:
 - Full genome: `training/start_full_genome_run.sh`
 - Single chromosome: `training/run_single_chromosome.sh`
-- Multi-GPU: `run_multi_gpu_training.py`
+- Multi-GPU: `training/run_multi_gpu_training.py`
 - Monitor: `monitoring/monitor_meta_training.sh`
 
 **Test/Validate**:
@@ -173,14 +185,14 @@ cd ../runpods
 **Analyze Data**:
 - Splice sites: `data/quick_splice_analysis.sh`
 - Gene patterns: `data/analyze_gene_patterns.sh`
-- Training data: `analyze_training_data.py`
-- Overlaps: `analyze_overlapping_genes.py`
+- Training data: `analysis/analyze_training_data.py`
+- Overlaps: `analysis/analyze_overlapping_genes.py`
 
 **Setup Environment**:
 - GPU: `gpu_env_setup/install_gpu_environment.sh`
 - Jupyter: `notebook/setup_jupyter_remote.sh`
 - MLflow: `mlflow/setup_mlflow_remote.sh`
-- Verify: `pre_flight_checks.py`
+- Verify: `validation/pre_flight_checks.py`
 
 **Work with RunPods**:
 - Setup: `../runpods/scripts/quick_pod_setup.sh`
@@ -188,14 +200,14 @@ cd ../runpods
 - Documentation: `../runpods/START_HERE.md`
 
 **Debug/Investigate**:
-- GPU: `diagnose_gpu_environment.py`
-- Dataset: `check_dataset.py`
-- Meta model: `inspect_meta_model_training_data.py`
-- Parquet: `inspect_parquet.py`
+- GPU: `installation/diagnose_gpu_environment.py`
+- Dataset: `testing/check_dataset.py`
+- Meta model: `analysis/inspect_meta_model_training_data.py`
+- Parquet: `analysis/inspect_parquet.py`
 
 **Maintain/Cleanup**:
-- Predictions: `cleanup_predictions.sh`
-- Artifacts: `cleanup_artifacts.py`
+- Predictions: `maintenance/cleanup_predictions.sh`
+- Artifacts: `maintenance/cleanup_artifacts.py`
 - Old data: `maintenance/cleanup_old_predictions.sh`
 
 ---
@@ -229,17 +241,18 @@ cd ../runpods
 
 ## ⚠️ Known Issues
 
-### Current State
-- Many loose files at root (63 files)
-- `testing/` directory has 85 files (needs organization)
-- Overlapping categories (data, data_management, data_processing)
-- Some scripts may be outdated
-- No clear archival strategy
+### Current State (Updated January 30, 2026)
+- ✅ Root directory cleaned - only 6 documentation files remain
+- ✅ Scripts organized into 23 functional subdirectories
+- ✅ Archive strategy implemented - outdated scripts in `archive/`
+- ✅ New directories created: `validation/`, `utilities/`, `archive/`
+- `testing/` directory has 85 files (may need further organization)
 
-### Ongoing Work
-- Moving deprecated scripts to `archive/`
-- Consolidating overlapping categories
-- Creating per-directory documentation
+### Recent Improvements
+- ✅ All root-level scripts categorized and moved
+- ✅ Duplicates resolved and documented
+- ✅ Entry points verified (no CLI tools moved)
+- See: **REORGANIZATION_SUMMARY.md** for complete details
 
 ---
 
@@ -282,14 +295,14 @@ cd ../runpods
 
 ### Script Management
 
-- **manage_scripts.py**: Script management utility
-- **pre_flight_checks.py**: Pre-execution validation
+- **utilities/manage_scripts.py**: Script management utility
+- **validation/pre_flight_checks.py**: Pre-execution validation
 
 ### Verification
 
-- **check_versions.py**: Python package versions
-- **check_gpu.py**: GPU availability
-- **verify_rename.sh**: Package rename verification
+- **testing/check_versions.py**: Python package versions
+- **testing/check_gpu.py**: GPU availability
+- **archive/verify_rename.sh**: Package rename verification (archived)
 
 ---
 
@@ -428,7 +441,7 @@ Tools:
 
 ---
 
-**Last Updated**: January 27, 2026  
-**Status**: In Reorganization - See REORGANIZATION_PLAN.md
+**Last Updated**: January 30, 2026  
+**Status**: ✅ Reorganization Complete - See REORGANIZATION_SUMMARY.md
 
 For questions or suggestions, see the main project documentation.
